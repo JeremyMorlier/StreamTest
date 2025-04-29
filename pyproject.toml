@@ -4,4 +4,10 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "stream-dse",
+    "torch>=2.7.0",
+]
+
+[tool.uv.sources]
+stream-dse = { path = "stream", editable = true }
