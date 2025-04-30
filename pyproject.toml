@@ -3,8 +3,9 @@ name = "stream"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
+    "onnxruntime-training>=1.19.2",
     "stream-dse",
     "torch>=2.7.0",
 ]
