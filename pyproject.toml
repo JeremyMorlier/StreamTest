@@ -6,9 +6,19 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "onnxruntime-training>=1.19.2",
+    "scipy>=1.15.2",
     "stream-dse",
     "torch>=2.7.0",
 ]
 
 [tool.uv.sources]
 stream-dse = { path = "stream", editable = true }
+
+[dependency-groups]
+visualize = [
+    "netron>=8.2.9",
+]
+bonus = [
+    "ipykernel>=6.29.5",
+    "onnxsim>=0.4.36",
+]
