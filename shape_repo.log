@@ -1,0 +1,46 @@
+Error during optimization: Unable to allocate 36.0 GiB for an array with shape (4, 512, 4608, 512) and data type object
+Traceback (most recent call last):
+  File "PATH/stream/stream/node_tensor.py", line 89, in extend_with_node
+    idx = self._get_and_increment_pointer()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "PATH/stream/stream/node_tensor.py", line 43, in _get_and_increment_pointer
+    raise IndexError
+IndexError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "PATH/test_conv.py", line 126, in <module>
+    raise e
+  File "PATH/test_conv.py", line 112, in <module>
+    scme = optimize_allocation_ga(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "PATH/stream/stream/api.py", line 110, in optimize_allocation_ga
+    answers = mainstage.run()
+              ^^^^^^^^^^^^^^^
+  File "PATH/stream/stream/stages/stage.py", line 62, in run
+    for cme, extra_info in self.list_of_callables[0](self.list_of_callables[1:], **self.kwargs).run():
+  File "PATH/stream/stream/stages/parsing/accelerator_parser.py", line 29, in run
+    for cme, extra_info in sub_stage.run():
+  File "PATH/stream/stream/stages/parsing/onnx_model_parser.py", line 42, in run
+    for cme, extra_info in sub_stage.run():
+  File "PATH/stream/stream/stages/generation/layer_stacks_generation.py", line 72, in run
+    for cme, extra_info in sub_stage.run():
+  File "PATH/stream/stream/stages/generation/tiling_generation.py", line 52, in run
+    for cme, extra_info in sub_stage.run():
+  File "PATH/stream/stream/stages/generation/tiled_workload_generation.py", line 98, in run
+    inter_edges = self.get_inter_edges_numpy(producer, consumer)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "PATH/stream/stream/stages/generation/tiled_workload_generation.py", line 647, in get_inter_edges_numpy
+    final_tensor = get_tensor_cn_for_op(final_node, dependent_operand)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "PATH/stream/stream/stages/generation/tiled_workload_generation.py", line 580, in get_tensor_cn_for_op
+    tensor_cns = self.get_tensor_cns(node, finer_nodes)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "PATH/stream/stream/stages/generation/tiled_workload_generation.py", line 789, in get_tensor_cns
+    tensors_cns[op] = tensors_cns[op].extend_with_node(bounded_op_dim_ranges, finer_node)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "PATH/stream/stream/node_tensor.py", line 97, in extend_with_node
+    new_tensor_np = np.zeros(new_full_shape, dtype=object)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 36.0 GiB for an array with shape (4, 512, 4608, 512) and data type object
