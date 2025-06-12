@@ -224,15 +224,6 @@ if __name__ == "__main__":
         result["core"] = core
         result["soc"] = soc
 
-        # Save the hardware configuration to a file
-        with open(f"{folder}/hardware_config.yaml", "w") as f:
-            f.write(str(hardware_config))
-
-        # Save the mapping configuration to a file
-        if mapping_config is not None:
-            with open(f"{folder}/mapping_config.yaml", "w") as f:
-                f.write(str(mapping_config))
-
         # Evaluate Using Stream
         scme = optimize_allocation_ga(
             hardware=f"{folder}/hardware_config.yaml",
