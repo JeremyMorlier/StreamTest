@@ -9,6 +9,7 @@ dependencies = [
     "scipy>=1.15.2",
     "stream-dse",
     "torch>=2.7.0",
+    "onnxsim>=0.4.36",
 ]
 
 [tool.uv.sources]
@@ -20,5 +21,4 @@ visualize = [
 ]
 bonus = [
     "ipykernel>=6.29.5",
-    "onnxsim>=0.4.36",
 ]
