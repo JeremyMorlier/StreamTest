@@ -77,7 +77,7 @@ class Config_Generator:
 
 
 if __name__ == "__main__":
-    folder = "onnx"
+    folder = "onnx/"
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
     train_onnx_path = f"{folder}/training_model.onnx"
