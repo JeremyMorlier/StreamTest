@@ -224,6 +224,10 @@ if __name__ == "__main__":
         result["core"] = core
         result["soc"] = soc
 
+
+        result["forwardbackward"] = {}
+        result["forward"] = {}
+        result["backward"] = {}
         # Evaluate Using Stream
         try :
             scme = optimize_allocation_ga(
