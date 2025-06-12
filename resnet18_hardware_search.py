@@ -77,7 +77,7 @@ class Config_Generator:
 
 
 if __name__ == "__main__":
-    folder = "onnx/"
+    folder = "onnx"
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
     train_onnx_path = f"{folder}/training_model.onnx"
@@ -88,8 +88,16 @@ if __name__ == "__main__":
     output_path = f"{folder}/output"
 
     # Stream Setups
-    soc_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core.yaml"
+    core_path = f"{folder}/core.yaml"
+    pooling_core_path = os.path.abspath(
+        "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
+    )
+    simd_core_path = os.path.abspath(
+        "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
+    )
+    offchip_core_path = os.path.abspath(
+        "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
+    )
     mode = "fused"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list(
         (i,) for i in range(22, 49)
@@ -190,17 +198,6 @@ if __name__ == "__main__":
         mode = config["mode"]
 
         # Generate Hardware and Mapping Config
-        core_path = f"{folder}/core.yaml"
-        soc_path = f"{folder}/chip.yaml"
-        pooling_core_path = os.path.abspath(
-            "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
-        )
-        simd_core_path = os.path.abspath(
-            "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
-        )
-        offchip_core_path = os.path.abspath(
-            "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
-        )
         core = stream_edge_tpu_core(
             hardware_config["n_SIMDS"],
             hardware_config["n_computes_lanes"],
@@ -222,8 +219,8 @@ if __name__ == "__main__":
             ["pooling.yaml", "simd.yaml"],
         )
         to_yaml(core, core_path)
-        to_yaml(soc, soc_path)
-        to_yaml(mapping, mapping_path)
+        to_yaml(soc, f"{folder}/hardware_config.yaml")
+        to_yaml(mapping, f"{folder}/mapping_config.yaml")
         result["core"] = core
         result["soc"] = soc
 
