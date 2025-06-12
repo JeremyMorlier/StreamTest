@@ -225,53 +225,68 @@ if __name__ == "__main__":
         result["soc"] = soc
 
         # Evaluate Using Stream
-        scme = optimize_allocation_ga(
-            hardware=f"{folder}/hardware_config.yaml",
-            workload=inferred_train_onnx_path3,
-            mapping=f"{folder}/mapping_config.yaml",
-            mode=mode,
-            layer_stacks=layer_stacks,
-            nb_ga_generations=4,
-            nb_ga_individuals=4,
-            experiment_id=id,
-            output_path=output_path,
-            skip_if_exists=False,
-        )
-        result["forwardbackward"]["scme"] = vars(scme)
-        result["forwardbackward"]["energy"] = scme["energy"]
-        result["forwardbackward"]["latency"] = scme["latency"]
+        try :
+            scme = optimize_allocation_ga(
+                hardware=f"{folder}/hardware_config.yaml",
+                workload=inferred_train_onnx_path3,
+                mapping=f"{folder}/mapping_config.yaml",
+                mode=mode,
+                layer_stacks=layer_stacks,
+                nb_ga_generations=4,
+                nb_ga_individuals=4,
+                experiment_id=id,
+                output_path=output_path,
+                skip_if_exists=False,
+            )
+            result["forwardbackward"]["scme"] = vars(scme)
+            result["forwardbackward"]["energy"] = scme["energy"]
+            result["forwardbackward"]["latency"] = scme["latency"]
+        except Exception:
+            result["forwardbackward"]["scme"] = 0
+            result["forwardbackward"]["energy"] = 0
+            result["forwardbackward"]["latency"] = 0           
 
-        # Evaluate Using Stream
-        scme = optimize_allocation_ga(
-            hardware=f"{folder}/hardware_config.yaml",
-            workload=f"{folder}/forward.onnx",
-            mapping=f"{folder}/mapping_config.yaml",
-            mode=mode,
-            layer_stacks=layer_stacks,
-            nb_ga_generations=4,
-            nb_ga_individuals=4,
-            experiment_id=id,
-            output_path=output_path,
-            skip_if_exists=False,
-        )
-        result["forward"]["scme"] = vars(scme)
-        result["forward"]["energy"] = scme["energy"]
-        result["forward"]["latency"] = scme["latency"]
-        scme = optimize_allocation_ga(
-            hardware=f"{folder}/hardware_config.yaml",
-            workload=f"{folder}/backward.onnx",
-            mapping=f"{folder}/mapping_config.yaml",
-            mode=mode,
-            layer_stacks=layer_stacks,
-            nb_ga_generations=4,
-            nb_ga_individuals=4,
-            experiment_id=id,
-            output_path=output_path,
-            skip_if_exists=False,
-        )
-        result["backward"]["scme"] = vars(scme)
-        result["backward"]["energy"] = scme["energy"]
-        result["backward"]["latency"] = scme["latency"]
+        try :
+            scme = optimize_allocation_ga(
+                hardware=f"{folder}/hardware_config.yaml",
+                workload=f"{folder}/forward.onnx",
+                mapping=f"{folder}/mapping_config.yaml",
+                mode=mode,
+                layer_stacks=layer_stacks,
+                nb_ga_generations=4,
+                nb_ga_individuals=4,
+                experiment_id=id,
+                output_path=output_path,
+                skip_if_exists=False,
+            )
+            result["forward"]["scme"] = vars(scme)
+            result["forward"]["energy"] = scme["energy"]
+            result["forward"]["latency"] = scme["latency"]
+        except Exception:
+            result["forward"]["scme"] = 0
+            result["forward"]["energy"] = 0
+            result["forward"]["latency"] = 0
+            
+        try :
+            scme = optimize_allocation_ga(
+                hardware=f"{folder}/hardware_config.yaml",
+                workload=f"{folder}/backward.onnx",
+                mapping=f"{folder}/mapping_config.yaml",
+                mode=mode,
+                layer_stacks=layer_stacks,
+                nb_ga_generations=4,
+                nb_ga_individuals=4,
+                experiment_id=id,
+                output_path=output_path,
+                skip_if_exists=False,
+            )
+            result["backward"]["scme"] = vars(scme)
+            result["backward"]["energy"] = scme["energy"]
+            result["backward"]["latency"] = scme["latency"]
+        except Exception:
+            result["backward"]["scme"] = 0
+            result["backward"]["energy"] = 0
+            result["backward"]["latency"] = 0
 
         with open(f"{folder}/resultt.txt", "a") as f:
             json.dump(result, f)
