@@ -190,12 +190,14 @@ if __name__ == "__main__":
         "yPE": [1, 2, 4, 6, 8],
     }
     Config_Generator = Config_Generator(10000, hw_choices, None, None, output_path)
-
+    id = 0
+    
     for config in Config_Generator:
         result = {}
         hardware_config = config["hardware_config"]
         mapping_config = config["mapping_config"]
         mode = config["mode"]
+        id = id + 1
 
         # Generate Hardware and Mapping Config
         core = stream_edge_tpu_core(
