@@ -245,7 +245,8 @@ if __name__ == "__main__":
             result["forwardbackward"]["scme"] = vars(scme)
             result["forwardbackward"]["energy"] = scme["energy"]
             result["forwardbackward"]["latency"] = scme["latency"]
-        except Exception:
+        except Exception as e:
+            print(f"Error during forward + backward optimization: {e}")
             result["forwardbackward"]["scme"] = 0
             result["forwardbackward"]["energy"] = 0
             result["forwardbackward"]["latency"] = 0           
@@ -266,7 +267,8 @@ if __name__ == "__main__":
             result["forward"]["scme"] = vars(scme)
             result["forward"]["energy"] = scme["energy"]
             result["forward"]["latency"] = scme["latency"]
-        except Exception:
+        except Exception as e:
+            print(f"Error during forward optimization: {e}")
             result["forward"]["scme"] = 0
             result["forward"]["energy"] = 0
             result["forward"]["latency"] = 0
@@ -287,7 +289,8 @@ if __name__ == "__main__":
             result["backward"]["scme"] = vars(scme)
             result["backward"]["energy"] = scme["energy"]
             result["backward"]["latency"] = scme["latency"]
-        except Exception:
+        except Exception as e:
+            print(f"Error during backward optimization: {e}")
             result["backward"]["scme"] = 0
             result["backward"]["energy"] = 0
             result["backward"]["latency"] = 0
