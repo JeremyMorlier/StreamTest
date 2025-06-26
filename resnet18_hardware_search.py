@@ -30,7 +30,7 @@ from process_onnx import (
 )
 import json
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 # Set the logging level to ERROR to suppress warnings
 ort.set_default_logger_severity(3)
 def sample_hardware_configs(choices):
@@ -77,6 +77,14 @@ class Config_Generator:
 
 
 if __name__ == "__main__":
+    logger = logging.getLogger(__name__)
+    
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    logger.addHandler(stream_handler)
+    error_handler = logging.FileHandler("error.log")
+    error_handler.setLevel(logging.ERROR)
+    logger.addHandler(error_handler)
     folder = "onnx/"
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
@@ -248,10 +256,13 @@ if __name__ == "__main__":
             result["forwardbackward"]["energy"] = scme["energy"]
             result["forwardbackward"]["latency"] = scme["latency"]
         except Exception as e:
+            logging.error(f"Error during forward + backward optimization: {e}")
             print(f"Error during forward + backward optimization: {e}")
             result["forwardbackward"]["scme"] = 0
             result["forwardbackward"]["energy"] = 0
-            result["forwardbackward"]["latency"] = 0           
+            result["forwardbackward"]["latency"] = 0  
+
+        logging.basicConfig(level=logging.ERROR)
 
         try :
             scme = optimize_allocation_ga(
@@ -270,7 +281,7 @@ if __name__ == "__main__":
             result["forward"]["energy"] = scme["energy"]
             result["forward"]["latency"] = scme["latency"]
         except Exception as e:
-            print(f"Error during forward optimization: {e}")
+            logging.error(f"Error during forward optimization: {e}")
             result["forward"]["scme"] = 0
             result["forward"]["energy"] = 0
             result["forward"]["latency"] = 0
@@ -292,7 +303,7 @@ if __name__ == "__main__":
             result["backward"]["energy"] = scme["energy"]
             result["backward"]["latency"] = scme["latency"]
         except Exception as e:
-            print(f"Error during backward optimization: {e}")
+            logging.error(f"Error during backward optimization: {e}")
             result["backward"]["scme"] = 0
             result["backward"]["energy"] = 0
             result["backward"]["latency"] = 0
