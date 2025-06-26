@@ -7,5 +7,5 @@
 #SBATCH --error=log/%x/%j/errors.err
 #SBATCH --qos=highbrain
 
-source .venv/bin/activate
+source /Brain/private/j20morli/StreamTest/.venv/bin/activate
 srun python3 resnet18_hardware_search.py
