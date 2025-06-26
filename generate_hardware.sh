@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --partition=Brain3090
+#SBATCH --partition=BrainA100
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --time=168:00:00
