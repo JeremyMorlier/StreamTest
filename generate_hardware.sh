@@ -5,6 +5,7 @@
 #SBATCH --time=168:00:00
 #SBATCH --output=log/%x/%j/logs.out
 #SBATCH --error=log/%x/%j/errors.err
+#SBATCH --qos=highbrain
 
 source .venv/bin/activate
 srun python3 resnet18_hardware_search.py
