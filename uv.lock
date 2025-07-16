@@ -1459,7 +1459,6 @@ dependencies = [
 [package.dev-dependencies]
 bonus = [
     { name = "ipykernel" },
-    { name = "onnxsim" },
 ]
 visualize = [
     { name = "netron" },
@@ -1476,10 +1475,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-bonus = [
-    { name = "ipykernel", specifier = ">=6.29.5" },
-    { name = "onnxsim", specifier = ">=0.4.36" },
-]
+bonus = [{ name = "ipykernel", specifier = ">=6.29.5" }]
 visualize = [{ name = "netron", specifier = ">=8.2.9" }]
 
 [[package]]
