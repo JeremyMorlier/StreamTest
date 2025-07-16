@@ -9,6 +9,7 @@
 
 export XDG_CONFIG_HOME=/Brain/private/j20morli/.config
 export UV_CACHE_DIR=/Brain/private/j20morli/.cache/uv
+export UV_PYTHON_INSTALL_DIR=/Brain/private/j20morli/.cache/uv/python
 
 source /Brain/private/j20morli/StreamTest2/.venv/bin/activate
 
