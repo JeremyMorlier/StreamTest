@@ -13,6 +13,4 @@ export UV_PYTHON_INSTALL_DIR=/Brain/private/j20morli/.cache/uv/python
 
 source /Brain/private/j20morli/StreamTest2/.venv/bin/activate
 
-uv pip list 
-
 srun python3 resnet18_hardware_search.py
