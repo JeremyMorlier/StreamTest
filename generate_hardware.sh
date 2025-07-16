@@ -10,4 +10,7 @@
 export XDG_CONFIG_HOME=/Brain/private/j20morli/.config
 
 source /Brain/private/j20morli/StreamTest/.venv/bin/activate
+
+uv pip list 
+
 srun python3 resnet18_hardware_search.py
