@@ -8,6 +8,7 @@
 #SBATCH --qos=highbrain
 
 export XDG_CONFIG_HOME=/Brain/private/j20morli/.config
+export UV_CACHE_DIR=/Brain/private/j20morli/.cache/uv
 
 source /Brain/private/j20morli/StreamTest2/.venv/bin/activate
 
