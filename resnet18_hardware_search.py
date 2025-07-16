@@ -33,6 +33,8 @@ import json
 logging.basicConfig(level=logging.ERROR)
 # Set the logging level to ERROR to suppress warnings
 ort.set_default_logger_severity(3)
+
+
 def sample_hardware_configs(choices):
     hardware_config = {
         "n_SIMDS": random.choice(choices["n_SIMDS"]),
@@ -78,7 +80,7 @@ class Config_Generator:
 
 if __name__ == "__main__":
     logger = logging.getLogger(__name__)
-    
+
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.INFO)
     logger.addHandler(stream_handler)
@@ -97,19 +99,14 @@ if __name__ == "__main__":
 
     # Stream Setups
     core_path = f"{folder}/core.yaml"
-    pooling_core_path = os.path.abspath(
-        "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
-    )
-    simd_core_path = os.path.abspath(
-        "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
-    )
-    offchip_core_path = os.path.abspath(
-        "stream/stream/inputs/examples/hardware/cores/pooling.yaml"
-    )
+    # pooling_core_path = os.path.abspath("stream/stream/inputs/examples/hardware/cores/pooling.yaml")
+    # simd_core_path = os.path.abspath("stream/stream/inputs/examples/hardware/cores/simd.yaml")
+    # offchip_core_path = os.path.abspath("stream/stream/inputs/examples/hardware/cores/offchip.yaml")
+    pooling_core_path = "./pooling.yaml"
+    simd_core_path = "./simd.yaml"
+    offchip_core_path = "./offchip.yaml"
     mode = "fused"
-    layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list(
-        (i,) for i in range(22, 49)
-    )
+    layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
 
     model = ResNet18()
     torch_input = torch.randn(4, 3, 32, 32)
@@ -134,41 +131,27 @@ if __name__ == "__main__":
     )
 
     # Infer training graph
-    inferred_model = shape_inference.infer_shapes_path(
-        train_onnx_path, inferred_train_onnx_path
-    )
-    inferred_model = shape_inference.infer_shapes_path(
-        train_onnx_path, inferred_train_onnx_path
-    )
-    inferred_model = shape_inference.infer_shapes_path(
-        train_onnx_path, inferred_train_onnx_path
-    )
+    inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
+    inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
+    inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
 
     onnx.save(
         process_convGrad(process_PoolGrad(onnx.load(inferred_train_onnx_path))),
         inferred_train_onnx_path2,
     )
-    inferred_model = shape_inference.infer_shapes_path(
-        inferred_train_onnx_path2, inferred_train_onnx_path2
-    )
-    inferred_model = shape_inference.infer_shapes_path(
-        inferred_train_onnx_path2, inferred_train_onnx_path2
-    )
+    inferred_model = shape_inference.infer_shapes_path(inferred_train_onnx_path2, inferred_train_onnx_path2)
+    inferred_model = shape_inference.infer_shapes_path(inferred_train_onnx_path2, inferred_train_onnx_path2)
     model_simplified, check = simplify(
         onnx.load(inferred_train_onnx_path2),
         skipped_optimizers=["extract_constant_to_initializer"],
     )
     onnx.save(process_1D_nodes(model_simplified), inferred_train_onnx_path3)
-    inferred_model = shape_inference.infer_shapes_path(
-        inferred_train_onnx_path3, inferred_train_onnx_path3
-    )
+    inferred_model = shape_inference.infer_shapes_path(inferred_train_onnx_path3, inferred_train_onnx_path3)
     print(onnx.checker.check_model(inferred_train_onnx_path3))
 
     # Split Forward and Backward
     onnx_model = onnx.load(inferred_train_onnx_path3)
-    forward_inputs, backward_inputs, forward_outputs, backward_outputs = (
-        split_forward_backward(onnx_model)
-    )
+    forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(onnx_model)
     onnx.utils.extract_model(
         inferred_train_onnx_path3,
         f"{folder}/forward.onnx",
@@ -188,18 +171,14 @@ if __name__ == "__main__":
     hw_choices = {
         "n_SIMDS": [16, 32, 64, 128],
         "n_computes_lanes": [1, 2, 4, 8],
-        "PE_Memory": [
-            int(int(element * 1024 * 1024 * 8)) for element in [0.5, 1, 2, 3, 4]
-        ],
-        "register_file_size": [
-            int(int(element * 1024 * 8)) for element in [8, 16, 32, 48, 64]
-        ],
+        "PE_Memory": [int(int(element * 1024 * 1024 * 8)) for element in [0.5, 1, 2, 3, 4]],
+        "register_file_size": [int(int(element * 1024 * 8)) for element in [8, 16, 32, 48, 64]],
         "xPE": [1, 2, 4, 6, 8],
         "yPE": [1, 2, 4, 6, 8],
     }
     Config_Generator = Config_Generator(10000, hw_choices, None, None, output_path)
     id = 0
-    
+
     for config in Config_Generator:
         result = {}
         hardware_config = config["hardware_config"]
@@ -217,7 +196,7 @@ if __name__ == "__main__":
         soc = stream_edge_tpu(
             hardware_config["xPE"],
             hardware_config["yPE"],
-            os.path.abspath(core_path),
+            "./core.yaml",
             [pooling_core_path, simd_core_path],
             offchip_core_path,
             32,
@@ -234,12 +213,11 @@ if __name__ == "__main__":
         result["core"] = core
         result["soc"] = soc
 
-
         result["forwardbackward"] = {}
         result["forward"] = {}
         result["backward"] = {}
         # Evaluate Using Stream
-        try :
+        try:
             scme = optimize_allocation_ga(
                 hardware=f"{folder}/hardware_config.yaml",
                 workload=inferred_train_onnx_path3,
@@ -249,7 +227,7 @@ if __name__ == "__main__":
                 nb_ga_generations=4,
                 nb_ga_individuals=4,
                 experiment_id=id,
-                output_path=output_path,
+                output_path=output_path + f"/{id}",
                 skip_if_exists=False,
             )
             result["forwardbackward"]["scme"] = vars(scme)
@@ -260,11 +238,11 @@ if __name__ == "__main__":
             print(f"Error during forward + backward optimization: {e}")
             result["forwardbackward"]["scme"] = 0
             result["forwardbackward"]["energy"] = 0
-            result["forwardbackward"]["latency"] = 0  
+            result["forwardbackward"]["latency"] = 0
 
         logging.basicConfig(level=logging.ERROR)
 
-        try :
+        try:
             scme = optimize_allocation_ga(
                 hardware=f"{folder}/hardware_config.yaml",
                 workload=f"{folder}/forward.onnx",
@@ -274,7 +252,7 @@ if __name__ == "__main__":
                 nb_ga_generations=4,
                 nb_ga_individuals=4,
                 experiment_id=id,
-                output_path=output_path,
+                output_path=output_path + f"/{id}",
                 skip_if_exists=False,
             )
             result["forward"]["scme"] = vars(scme)
@@ -285,8 +263,8 @@ if __name__ == "__main__":
             result["forward"]["scme"] = 0
             result["forward"]["energy"] = 0
             result["forward"]["latency"] = 0
-            
-        try :
+
+        try:
             scme = optimize_allocation_ga(
                 hardware=f"{folder}/hardware_config.yaml",
                 workload=f"{folder}/backward.onnx",
@@ -296,7 +274,7 @@ if __name__ == "__main__":
                 nb_ga_generations=4,
                 nb_ga_individuals=4,
                 experiment_id=id,
-                output_path=output_path,
+                output_path=output_path + f"/{id}",
                 skip_if_exists=False,
             )
             result["backward"]["scme"] = vars(scme)
@@ -311,3 +289,4 @@ if __name__ == "__main__":
         with open(f"{folder}/resultt.txt", "a") as f:
             json.dump(result, f)
             f.write("\n")
+        # break
