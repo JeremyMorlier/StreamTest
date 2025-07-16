@@ -300,7 +300,101 @@ def process_convGrad(onnx_model) :
 
     return onnx_model
 
+def add_optimizer(onnx_model, optimizer_name="Adam", learning_rate=0.001, weight_decay= 0, beta1=0.9, beta2=0.999, epsilon=1e-8):
+    """
+    Add the optimizer to the Forward and Backward nodes in the ONNX model.
+    """
+    node_list = []
+    # Create an intializer for the learning rate
+    onnx_model.graph.initializer.append(make_initializer("learning_rate", [learning_rate], np.float32))
+    onnx_model.graph.initializer.append(make_initializer("weight_decay", [weight_decay], np.float32))
+    onnx_model.graph.initializer.append(make_initializer("epsilon", [epsilon], np.float32))
+    onnx_model.graph.initializer.append(make_initializer("beta1", [epsilon], np.float32))
+    onnx_model.graph.initializer.append(make_initializer("beta2", [epsilon], np.float32))
+
+    # Lists to store the name of all the inputs and outputs required to run only the optimizer
+    optimizer_inputs = []
+    optimizer_outputs = []
+    # Get all gradients accumulations outputs of the model
+    grad_accumulation_names = []
+    for input_tensor in onnx_model.graph.input :
+        if "grad.accumulation.buffer" in input_tensor.name :
+            grad_accumulation_names.append(input_tensor.name)
+            # If the input tensor is a gradient accumulation output, we add it to the input list
+            optimizer_inputs.append(input_tensor.name)    
+    optimizer_inputs.append("lazy_reset_grad")
+    for output_tensor in onnx_model.graph.output :
+        if "grad.accumulation" in output_tensor.name:
+            optimizer_outputs.append(output_tensor.name)
+
     
+    grad_accumulation_names2 = []
+    for node in onnx_model.graph.node :
+        if node.op_type == "InPlaceAccumulatorV2" :
+            for input in node.input :
+                if "grad.accumulation.buffer" in input :
+                    grad_accumulation_names2.append(node.input[1])
+
+    gradient_weights = []
+    for i, input_tensor in enumerate(onnx_model.graph.input) :
+        for element, element2 in zip(grad_accumulation_names, grad_accumulation_names2) :
+            if input_tensor.name in element and "buffer" not in input_tensor.name:
+                # If the input tensor is a gradient accumulation output, we add it to the input list
+                gradient_weights.append((input_tensor.name, element2))
+
+    for input_name, gradient_buffer_name in gradient_weights :
+        # Create the optimizer nodes (only SGD and Adam are supported for now)
+
+        if weight_decay != 0 :
+            # Create a weight decay node
+            weight_decay_node = make_node("Mul", [input_name, "weight_decay"], [input_name + "_weight_decay"], name=f"{optimizer_name}_WeightDecay_{input_name}")
+            g_node = make_node("Add", [gradient_buffer_name, input_name + "_weight_decay"], [gradient_buffer_name + "_optimizer_g"], name=f"{optimizer_name}_WeightDecay_Add_{input_name}")
+            node_list.append(weight_decay_node)
+            node_list.append(g_node)
+            gradient_buffer_name = gradient_buffer_name + "_optimizer_g"
+        # For now we do not consider maximize and amsgrad (as detailed here https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html)
+        # Without loss of generality for Stream, we assume that the constant computation (1-Beta2) Beta**t is done and is Beta2 (same for Beta1)
+        if optimizer_name == "Adam" :
+            final_gradient_name = input_name + "_optimizer"
+            # Add inputs for the previous optimizers states
+            weight_shape = get_onnx_tensor_type(input_name, onnx_model).shape
+            onnx_model.graph.input.append(make_tensor_value_info(input_name + "_optimizer_first_moment", TensorProto.FLOAT, weight_shape))
+            onnx_model.graph.input.append(make_tensor_value_info(input_name + "_optimizer_second_moment", TensorProto.FLOAT, weight_shape))
+
+            optimizer_inputs.extend([input_name, gradient_buffer_name, input_name + "_optimizer_first_moment", input_name + "_optimizer_second_moment"])
+            # First Moment Computation
+            mul_first_moment_node = make_node("Mul", [input_name + "_optimizer_first_moment", "beta1"], [input_name + "_optimizer11"], name=f"{optimizer_name}_Optimizer_{input_name}_MulFirstMoment")
+            mul_first_moment_node2 = make_node("Mul", [gradient_buffer_name, "beta1"], [input_name + "_optimizer10"], name=f"{optimizer_name}_Optimizer_{input_name}_MulFirstMoment2")
+            add_first_moment_node = make_node("Add", [input_name + "_optimizer10", input_name + "_optimizer11"], [input_name + "_optimizer9"], name=f"{optimizer_name}_Optimizer_{input_name}_First_Moment")
+            mean_first_moment_node = make_node("Div", [input_name + "_optimizer9", "beta1"], [input_name + "_optimizer1"], name=f"{optimizer_name}_Optimizer_{input_name}_MeanFirst_Moment")
+            # Second Moment Computation 
+            mul_node3 = make_node("Mul", [gradient_buffer_name, gradient_buffer_name], [input_name + "_optimizer8"], name=f"{optimizer_name}_Optimizer_{input_name}_Mul3")
+            mul_node2 = make_node("Mul", [input_name + "_optimizer8", "beta2"], [input_name + "_optimizer7"], name=f"{optimizer_name}_Optimizer_{input_name}_Mul2")
+            mul_node1 = make_node("Mul", [input_name + "_optimizer_second_moment", "beta2"], [input_name + "_optimizer6"], name=f"{optimizer_name}_Optimizer_{input_name}_Mul1")
+            add_second_moment_node = make_node("Add", [input_name + "_optimizer6", input_name + "_optimizer7"], [input_name + "_optimizer5"], name=f"{optimizer_name}_Optimizer_{input_name}_Second_Moment")
+            mean_second_moment_node = make_node("Div", [input_name + "_optimizer5", "beta2"], [input_name + "_optimizer4"], name=f"{optimizer_name}_Optimizer_{input_name}_MeanSecond_Moment")
+            second_moment_node_1 = make_node("Sqrt", [input_name + "_optimizer4"], [input_name + "_optimizer3"], name=f"{optimizer_name}_Optimizer_{input_name}_second_moment1")
+            second_moment_node = make_node("Add", [input_name + "_optimizer3", "epsilon"], [input_name + "_optimizer2"], name=f"{optimizer_name}_Optimizer_{input_name}_second_moment")
+            final_optimizer_node = make_node("Div", [input_name + "_optimizer1", input_name + "_optimizer2"], [final_gradient_name], name=f"{optimizer_name}_Optimizer_{input_name}")
+            node_list.extend([mul_first_moment_node, mul_first_moment_node2, add_first_moment_node, mean_first_moment_node,
+                              mul_node3, mul_node2, mul_node1, add_second_moment_node, mean_second_moment_node,
+                              second_moment_node_1, second_moment_node, final_optimizer_node])
+        elif optimizer_name == "SGD" :
+            optimizer_inputs.append(input_name, gradient_buffer_name)
+            final_gradient_name = gradient_buffer_name
+        optimizer_node_1 = make_node("Mul", [final_gradient_name, "learning_rate"], [input_name + "_optimizer0"], name=f"{optimizer_name}_Optimizer_{input_name}")
+        optimizer_node_2 = make_node("Sub", [input_name, input_name + "_optimizer0"], [input_name + "_optimizer_end"], name=f"{optimizer_name}_Update_{input_name}")
+        node_list.append(optimizer_node_1)
+        node_list.append(optimizer_node_2)
+
+        output_tensor = helper.make_tensor_value_info(input_name + "_optimizer_end", TensorProto.FLOAT, None)
+        optimizer_outputs.append(input_name + "_optimizer_end")
+        onnx_model.graph.output.append(output_tensor)
+    for node in node_list :
+        onnx_model.graph.node.append(node)
+    
+    return onnx_model, optimizer_inputs, optimizer_outputs
+
 if __name__ == "__main__":
     folder = "onnx/test"
     onnx_file = f"{folder}/simplified.onnx"

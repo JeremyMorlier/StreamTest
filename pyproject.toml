@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "onnxruntime-training>=1.19.2",
+    "onnxsim>=0.4.36",
+    "pydot>=4.0.1",
     "scipy>=1.15.2",
     "stream-dse",
     "torch>=2.7.0",
@@ -22,3 +24,11 @@ bonus = [
     "ipykernel>=6.29.5",
     "onnxsim>=0.4.36",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+fix = true
+lint.select = ["E", "F", "W", "I", "PL", "N", "UP", "B"]
+lint.ignore = ["D401", "N806"]
+lint.pylint.max-args = 8
