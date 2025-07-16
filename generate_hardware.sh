@@ -9,7 +9,7 @@
 
 export XDG_CONFIG_HOME=/Brain/private/j20morli/.config
 
-source /Brain/private/j20morli/StreamTest/.venv/bin/activate
+source /Brain/private/j20morli/StreamTest2/.venv/bin/activate
 
 uv pip list 
 
