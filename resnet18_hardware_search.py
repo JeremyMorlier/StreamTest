@@ -1,34 +1,34 @@
+import json
+import logging
+import math
+import multiprocessing
 import os
-
 import random
+import shutil
+from pathlib import Path
 
+import onnxruntime as ort
 import torch
-import torch.nn as nn
+from onnxruntime.training import artifacts
+from onnxsim import simplify
+from tqdm.contrib.concurrent import process_map
 
 import onnx
 from onnx import shape_inference
-from onnxruntime.training import artifacts
-import onnxruntime as ort
-from onnxsim import simplify
-from stream.api import optimize_allocation_ga
-
-import logging
-
+from process_onnx import (
+    process_1D_nodes,
+    process_convGrad,
+    process_PoolGrad,
+    split_forward_backward,
+)
 from resnet18 import ResNet18
-
+from stream.api import optimize_allocation_ga
 from stream_hardware_generator import (
-    stream_edge_tpu_core,
     stream_edge_tpu,
+    stream_edge_tpu_core,
     stream_edge_tpu_mapping,
     to_yaml,
 )
-from process_onnx import (
-    process_convGrad,
-    process_PoolGrad,
-    process_1D_nodes,
-    split_forward_backward,
-)
-import json
 
 logging.basicConfig(level=logging.ERROR)
 # Set the logging level to ERROR to suppress warnings
@@ -48,7 +48,7 @@ def sample_hardware_configs(choices):
 
 
 class Config_Generator:
-    def __init__(self, max_iter, hw_choices, mapping_config, hardware_config, path):
+    def __init__(self, max_iter, hw_choices, mapping_config, hardware_config, path, nn_path):
         self.max_iter = max_iter
         self.i = 0
         self.hw_choices = hw_choices
@@ -56,6 +56,7 @@ class Config_Generator:
         self.mapping_config = mapping_config
         self.hardware_config = hardware_config
         self.path = path
+        self.nn_path = nn_path
         self.mode = mode
 
     def __next__(self):
@@ -67,6 +68,10 @@ class Config_Generator:
             config["mapping_config"] = self.mapping_config
             config["path"] = self.path
             config["mode"] = self.mode
+            config["forward_backward"] = f"{self.nn_path}/forward_backward.onnx"
+            config["forward"] = f"{self.nn_path}/forward.onnx"
+            config["backward"] = f"{self.nn_path}/backward.onnx"
+
             return config
         else:
             raise StopIteration
@@ -76,6 +81,131 @@ class Config_Generator:
 
     def __len__(self):
         return self.max_iter
+
+
+def evaluate_performance(config):
+    result = {}
+    hardware_config = config["hardware_config"]
+    mapping_config = config["mapping_config"]
+    mode = config["mode"]
+    id_process = multiprocessing.current_process().name
+    id_process = id_process.split("-")[-1]
+    folder = config["path"] + "/" + id_process
+    print(folder)
+    Path(folder).mkdir(parents=True, exist_ok=True)
+
+    forward_backward_path = config["forward_backward"]
+    forward_path = config["backward"]
+    backward_path = config["forward"]
+
+    # Generate Hardware and Mapping Config
+    core = stream_edge_tpu_core(
+        hardware_config["n_SIMDS"],
+        hardware_config["n_computes_lanes"],
+        hardware_config["PE_Memory"],
+        hardware_config["register_file_size"],
+    )
+    soc = stream_edge_tpu(
+        hardware_config["xPE"],
+        hardware_config["yPE"],
+        "./core.yaml",
+        [pooling_core_path, simd_core_path],
+        offchip_core_path,
+        32,
+        0,
+    )
+    mapping = stream_edge_tpu_mapping(
+        hardware_config["xPE"],
+        hardware_config["yPE"],
+        ["./pooling.yaml", "./simd.yaml"],
+    )
+    # Copy Necessary Files
+    shutil.copyfile(f"{folder}/../pooling.yaml", f"{folder}/pooling.yaml")
+    shutil.copyfile(f"{folder}/../simd.yaml", f"{folder}/simd.yaml")
+    shutil.copyfile(f"{folder}/../offchip.yaml", f"{folder}/offchip.yaml")
+    to_yaml(core, f"{folder}/core.yaml")
+    to_yaml(soc, f"{folder}/hardware_config.yaml")
+    to_yaml(mapping, f"{folder}/mapping_config.yaml")
+    result["core"] = core
+    result["soc"] = soc
+
+    result["forwardbackward"] = {}
+    result["forward"] = {}
+    result["backward"] = {}
+    # Evaluate Using Stream
+    try:
+        scme = optimize_allocation_ga(
+            hardware=f"{folder}/hardware_config.yaml",
+            workload=forward_backward_path,
+            mapping=f"{folder}/mapping_config.yaml",
+            mode=mode,
+            layer_stacks=layer_stacks,
+            nb_ga_generations=4,
+            nb_ga_individuals=4,
+            experiment_id=id,
+            output_path=output_path + f"/{id}",
+            skip_if_exists=False,
+        )
+        result["forwardbackward"]["scme"] = vars(scme)
+        result["forwardbackward"]["energy"] = scme["energy"]
+        result["forwardbackward"]["latency"] = scme["latency"]
+    except Exception as e:
+        logging.error(f"Error during forward + backward optimization: {e}")
+        print(f"Error during forward + backward optimization: {e}")
+        result["forwardbackward"]["scme"] = 0
+        result["forwardbackward"]["energy"] = 0
+        result["forwardbackward"]["latency"] = 0
+
+    logging.basicConfig(level=logging.ERROR)
+
+    try:
+        scme = optimize_allocation_ga(
+            hardware=f"{folder}/hardware_config.yaml",
+            workload=forward_path,
+            mapping=f"{folder}/mapping_config.yaml",
+            mode=mode,
+            layer_stacks=layer_stacks,
+            nb_ga_generations=4,
+            nb_ga_individuals=4,
+            experiment_id=id,
+            output_path=output_path + f"/{id}",
+            skip_if_exists=False,
+        )
+        result["forward"]["scme"] = vars(scme)
+        result["forward"]["energy"] = scme["energy"]
+        result["forward"]["latency"] = scme["latency"]
+    except Exception as e:
+        logging.error(f"Error during forward optimization: {e}")
+        result["forward"]["scme"] = 0
+        result["forward"]["energy"] = 0
+        result["forward"]["latency"] = 0
+
+    try:
+        scme = optimize_allocation_ga(
+            hardware=f"{folder}/hardware_config.yaml",
+            workload=backward_path,
+            mapping=f"{folder}/mapping_config.yaml",
+            mode=mode,
+            layer_stacks=layer_stacks,
+            nb_ga_generations=4,
+            nb_ga_individuals=4,
+            experiment_id=id,
+            output_path=output_path + f"/{id}",
+            skip_if_exists=False,
+        )
+        result["backward"]["scme"] = vars(scme)
+        result["backward"]["energy"] = scme["energy"]
+        result["backward"]["latency"] = scme["latency"]
+    except Exception as e:
+        logging.error(f"Error during backward optimization: {e}")
+        result["backward"]["scme"] = 0
+        result["backward"]["energy"] = 0
+        result["backward"]["latency"] = 0
+
+    with open(f"{folder}/resultt.txt", "a") as f:
+        json.dump(result, f)
+        f.write("\n")
+    # break
 
 
 if __name__ == "__main__":
@@ -176,117 +306,15 @@ if __name__ == "__main__":
         "xPE": [1, 2, 4, 6, 8],
         "yPE": [1, 2, 4, 6, 8],
     }
-    Config_Generator = Config_Generator(10000, hw_choices, None, None, output_path)
+
+    num_task = 10000
+    num_workers = min(num_task, int(os.cpu_count() / 2) + 1)
+    chunksize = math.ceil(num_task / num_workers)
+
+    config_Generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
     id = 0
 
-    for config in Config_Generator:
-        result = {}
-        hardware_config = config["hardware_config"]
-        mapping_config = config["mapping_config"]
-        mode = config["mode"]
-        id = id + 1
-
-        # Generate Hardware and Mapping Config
-        core = stream_edge_tpu_core(
-            hardware_config["n_SIMDS"],
-            hardware_config["n_computes_lanes"],
-            hardware_config["PE_Memory"],
-            hardware_config["register_file_size"],
-        )
-        soc = stream_edge_tpu(
-            hardware_config["xPE"],
-            hardware_config["yPE"],
-            "./core.yaml",
-            [pooling_core_path, simd_core_path],
-            offchip_core_path,
-            32,
-            0,
-        )
-        mapping = stream_edge_tpu_mapping(
-            hardware_config["xPE"],
-            hardware_config["yPE"],
-            ["pooling.yaml", "simd.yaml"],
-        )
-        to_yaml(core, core_path)
-        to_yaml(soc, f"{folder}/hardware_config.yaml")
-        to_yaml(mapping, f"{folder}/mapping_config.yaml")
-        result["core"] = core
-        result["soc"] = soc
-
-        result["forwardbackward"] = {}
-        result["forward"] = {}
-        result["backward"] = {}
-        # Evaluate Using Stream
-        try:
-            scme = optimize_allocation_ga(
-                hardware=f"{folder}/hardware_config.yaml",
-                workload=inferred_train_onnx_path3,
-                mapping=f"{folder}/mapping_config.yaml",
-                mode=mode,
-                layer_stacks=layer_stacks,
-                nb_ga_generations=4,
-                nb_ga_individuals=4,
-                experiment_id=id,
-                output_path=output_path + f"/{id}",
-                skip_if_exists=False,
-            )
-            result["forwardbackward"]["scme"] = vars(scme)
-            result["forwardbackward"]["energy"] = scme["energy"]
-            result["forwardbackward"]["latency"] = scme["latency"]
-        except Exception as e:
-            logging.error(f"Error during forward + backward optimization: {e}")
-            print(f"Error during forward + backward optimization: {e}")
-            result["forwardbackward"]["scme"] = 0
-            result["forwardbackward"]["energy"] = 0
-            result["forwardbackward"]["latency"] = 0
-
-        logging.basicConfig(level=logging.ERROR)
-
-        try:
-            scme = optimize_allocation_ga(
-                hardware=f"{folder}/hardware_config.yaml",
-                workload=f"{folder}/forward.onnx",
-                mapping=f"{folder}/mapping_config.yaml",
-                mode=mode,
-                layer_stacks=layer_stacks,
-                nb_ga_generations=4,
-                nb_ga_individuals=4,
-                experiment_id=id,
-                output_path=output_path + f"/{id}",
-                skip_if_exists=False,
-            )
-            result["forward"]["scme"] = vars(scme)
-            result["forward"]["energy"] = scme["energy"]
-            result["forward"]["latency"] = scme["latency"]
-        except Exception as e:
-            logging.error(f"Error during forward optimization: {e}")
-            result["forward"]["scme"] = 0
-            result["forward"]["energy"] = 0
-            result["forward"]["latency"] = 0
-
-        try:
-            scme = optimize_allocation_ga(
-                hardware=f"{folder}/hardware_config.yaml",
-                workload=f"{folder}/backward.onnx",
-                mapping=f"{folder}/mapping_config.yaml",
-                mode=mode,
-                layer_stacks=layer_stacks,
-                nb_ga_generations=4,
-                nb_ga_individuals=4,
-                experiment_id=id,
-                output_path=output_path + f"/{id}",
-                skip_if_exists=False,
-            )
-            result["backward"]["scme"] = vars(scme)
-            result["backward"]["energy"] = scme["energy"]
-            result["backward"]["latency"] = scme["latency"]
-        except Exception as e:
-            logging.error(f"Error during backward optimization: {e}")
-            result["backward"]["scme"] = 0
-            result["backward"]["energy"] = 0
-            result["backward"]["latency"] = 0
-
-        with open(f"{folder}/resultt.txt", "a") as f:
-            json.dump(result, f)
-            f.write("\n")
-        # break
+    config_iterator = iter(config_Generator)
+    r = process_map(evaluate_performance, config_iterator, max_workers=num_workers, chunksize=chunksize)
+    print(r)
+    # for config in Config_Generator:
