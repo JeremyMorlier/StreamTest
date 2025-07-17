@@ -123,45 +123,45 @@ def stream_edge_tpu_mapping(xPEs, yPEs, additional_cores):
             "name": "default",
             "core_allocation": [element for element in range(0, xPEs * yPEs)],
             "intra_core_tiling": ["D, all"],
-            "inter_core_tiling": ["K, *"],
+            "inter_core_tiling": [f"K, {xPEs * yPEs}"],
         },
         {
             "name": "Conv",
             "core_allocation": [element for element in range(0, xPEs * yPEs)],
             "intra_core_tiling": ["OY, all"],
-            "inter_core_tiling": ["K, *"],
+            "inter_core_tiling": ["K, 1"],
         },
         {
             "name": "Gemm",
             "core_allocation": [element for element in range(0, xPEs * yPEs)],
             "intra_core_tiling": ["D, all"],
-            "inter_core_tiling": ["H, *"],
+            "inter_core_tiling": [f"K, {xPEs * yPEs}"],
         },
         {
             "name": "Pool",
             "core_allocation": pooling_cores,
             "intra_core_tiling": ["OY, all"],
-            "inter_core_tiling": ["K, *"],
+            "inter_core_tiling": ["K, 1"],
         },
         {
             "name": "MaxPool",
             "core_allocation": pooling_cores,
             "intra_core_tiling": ["OY, all"],
-            "inter_core_tiling": ["K, *"],
+            "inter_core_tiling": ["K, 1"],
         },
         {
             "name": "AveragePool",
             "core_allocation": pooling_cores,
             "intra_core_tiling": ["OY, all"],
-            "inter_core_tiling": ["K, *"],
+            "inter_core_tiling": ["K, 1"],
         },
         {
             "name": "GlobalAveragePool",
             "core_allocation": pooling_cores,
             "intra_core_tiling": ["OY, all"],
-            "inter_core_tiling": ["K, *"],
+            "inter_core_tiling": ["K, 1"],
         },
-        {"name": "Add", "core_allocation": adder_cores, "intra_core_tiling": ["D, all"], "inter_core_tiling": ["H, *"]},
+        {"name": "Add", "core_allocation": adder_cores, "intra_core_tiling": ["D, all"], "inter_core_tiling": ["H, 1"]},
     ]
     return mapping_config
 
