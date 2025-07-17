@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import random
 import shutil
+from multiprocessing import Pool
 from pathlib import Path
 
 import onnxruntime as ort
@@ -313,6 +314,9 @@ if __name__ == "__main__":
     id = 0
 
     config_iterator = iter(config_generator)
-    r = process_map(evaluate_performance, config_iterator, max_workers=num_workers, chunksize=chunksize)
-    print(r)
+    with Pool(processes=num_workers) as pool:
+        r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
+        print(r)
+    # r = process_map(evaluate_performance, config_iterator, max_workers=num_workers, chunksize=chunksize)
+    # print(r)
     # for config in Config_Generator:
