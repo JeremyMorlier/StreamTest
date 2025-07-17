@@ -7,6 +7,7 @@
 #SBATCH --error=log/%x/%j/errors.err
 #SBATCH --qos=highbrain
 
+--ntasks=1 --cpus-per-task=32 --time=168:00:00 --qos=highbrain
 export XDG_CONFIG_HOME=/Brain/private/j20morli/.config
 export UV_CACHE_DIR=/Brain/private/j20morli/.cache/uv
 export UV_PYTHON_INSTALL_DIR=/Brain/private/j20morli/.cache/uv/python
