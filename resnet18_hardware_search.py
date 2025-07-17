@@ -156,8 +156,6 @@ def evaluate_performance(config):
         result["forwardbackward"]["energy"] = 0
         result["forwardbackward"]["latency"] = 0
 
-    logging.basicConfig(level=logging.ERROR)
-
     try:
         scme = optimize_allocation_ga(
             hardware=f"{folder}/hardware_config.yaml",
@@ -211,8 +209,9 @@ def evaluate_performance(config):
 if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
+    logging.disable(logging.CRITICAL)
     stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
+    stream_handler.setLevel(logging.CRITICAL)
     logger.addHandler(stream_handler)
     error_handler = logging.FileHandler("error.log")
     error_handler.setLevel(logging.ERROR)
