@@ -211,13 +211,14 @@ def evaluate_performance(config):
 if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
-    logging.disable(logging.CRITICAL)
+    # logging.disable(logging.CRITICAL)
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.CRITICAL)
     logger.addHandler(stream_handler)
     error_handler = logging.FileHandler("error.log")
     error_handler.setLevel(logging.ERROR)
     logger.addHandler(error_handler)
+
     folder = "onnx/"
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
