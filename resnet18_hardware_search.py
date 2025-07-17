@@ -168,21 +168,21 @@ def evaluate_performance(config):
         result["forward"]["energy"] = scme["energy"]
         result["forward"]["latency"] = scme["latency"]
 
-        scme = optimize_allocation_ga(
-            hardware=f"{folder}/hardware_config.yaml",
-            workload=f"{folder}/backward.onnx",
-            mapping=f"{folder}/mapping_config.yaml",
-            mode=mode,
-            layer_stacks=layer_stacks,
-            nb_ga_generations=4,
-            nb_ga_individuals=4,
-            experiment_id=id,
-            output_path=folder,
-            skip_if_exists=False,
-        )
-        result["backward"]["scme"] = vars(scme)
-        result["backward"]["energy"] = scme["energy"]
-        result["backward"]["latency"] = scme["latency"]
+        # scme = optimize_allocation_ga(
+        #     hardware=f"{folder}/hardware_config.yaml",
+        #     workload=f"{folder}/backward.onnx",
+        #     mapping=f"{folder}/mapping_config.yaml",
+        #     mode=mode,
+        #     layer_stacks=layer_stacks,
+        #     nb_ga_generations=4,
+        #     nb_ga_individuals=4,
+        #     experiment_id=id,
+        #     output_path=folder,
+        #     skip_if_exists=False,
+        # )
+        # result["backward"]["scme"] = vars(scme)
+        # result["backward"]["energy"] = scme["energy"]
+        # result["backward"]["latency"] = scme["latency"]
     except Exception as e:
         logging.error(f"Error: {e}")
         print(f"Error: {e}")
