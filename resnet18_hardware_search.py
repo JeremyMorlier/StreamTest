@@ -91,7 +91,6 @@ def evaluate_performance(config):
     id_process = multiprocessing.current_process().name
     id_process = id_process.split("-")[-1]
     folder = config["path"] + "/" + id_process
-    print(folder)
     Path(folder).mkdir(parents=True, exist_ok=True)
 
     forward_backward_path = config["forward_backward"]
