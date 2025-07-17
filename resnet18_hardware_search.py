@@ -311,6 +311,7 @@ if __name__ == "__main__":
 
     num_task = 10000
     num_workers = min(num_task, int(os.cpu_count() / 2) + 1)
+    num_workers = 8
     chunksize = math.ceil(num_task / num_workers)
 
     config_Generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
