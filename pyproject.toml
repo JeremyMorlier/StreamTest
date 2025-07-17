@@ -12,6 +12,7 @@ dependencies = [
     "stream-dse",
     "torch>=2.7.0",
     "onnxsim>=0.4.36",
+    "uv"
 ]
 
 [tool.uv.sources]
