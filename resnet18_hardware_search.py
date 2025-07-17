@@ -122,6 +122,9 @@ def evaluate_performance(config):
     shutil.copyfile(f"{folder}/../pooling.yaml", f"{folder}/pooling.yaml")
     shutil.copyfile(f"{folder}/../simd.yaml", f"{folder}/simd.yaml")
     shutil.copyfile(f"{folder}/../offchip.yaml", f"{folder}/offchip.yaml")
+    shutil.copyfile(forward_backward_path, f"{folder}/forward_backward.onnx")
+    shutil.copyfile(forward_path, f"{folder}/forward.onnx")
+    shutil.copyfile(backward_path, f"{folder}/backward.onnx")
     to_yaml(core, f"{folder}/core.yaml")
     to_yaml(soc, f"{folder}/hardware_config.yaml")
     to_yaml(mapping, f"{folder}/mapping_config.yaml")
@@ -135,7 +138,7 @@ def evaluate_performance(config):
     try:
         scme = optimize_allocation_ga(
             hardware=f"{folder}/hardware_config.yaml",
-            workload=forward_backward_path,
+            workload=f"{folder}/forward_backward.onnx",
             mapping=f"{folder}/mapping_config.yaml",
             mode=mode,
             layer_stacks=layer_stacks,
@@ -158,7 +161,7 @@ def evaluate_performance(config):
     try:
         scme = optimize_allocation_ga(
             hardware=f"{folder}/hardware_config.yaml",
-            workload=forward_path,
+            workload=f"{folder}/forward.onnx",
             mapping=f"{folder}/mapping_config.yaml",
             mode=mode,
             layer_stacks=layer_stacks,
@@ -180,7 +183,7 @@ def evaluate_performance(config):
     try:
         scme = optimize_allocation_ga(
             hardware=f"{folder}/hardware_config.yaml",
-            workload=backward_path,
+            workload=f"{folder}/backward.onnx",
             mapping=f"{folder}/mapping_config.yaml",
             mode=mode,
             layer_stacks=layer_stacks,
