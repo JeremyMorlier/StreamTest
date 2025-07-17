@@ -222,7 +222,7 @@ if __name__ == "__main__":
     train_onnx_path = f"{folder}/training_model.onnx"
     inferred_train_onnx_path = f"{folder}/infered_training_model.onnx"
     inferred_train_onnx_path2 = f"{folder}/infered_training_model2.onnx"
-    inferred_train_onnx_path3 = f"{folder}/infered_training_model3.onnx"
+    inferred_train_onnx_path3 = f"{folder}/forward_backward.onnx"
 
     output_path = f"{folder}/output"
 
