@@ -145,7 +145,7 @@ def evaluate_performance(config):
             nb_ga_generations=4,
             nb_ga_individuals=4,
             experiment_id=id,
-            output_path=output_path + f"/{id}",
+            output_path=folder,
             skip_if_exists=False,
         )
         result["forwardbackward"]["scme"] = vars(scme)
@@ -168,7 +168,7 @@ def evaluate_performance(config):
             nb_ga_generations=4,
             nb_ga_individuals=4,
             experiment_id=id,
-            output_path=output_path + f"/{id}",
+            output_path=folder,
             skip_if_exists=False,
         )
         result["forward"]["scme"] = vars(scme)
@@ -190,7 +190,7 @@ def evaluate_performance(config):
             nb_ga_generations=4,
             nb_ga_individuals=4,
             experiment_id=id,
-            output_path=output_path + f"/{id}",
+            output_path=folder,
             skip_if_exists=False,
         )
         result["backward"]["scme"] = vars(scme)
