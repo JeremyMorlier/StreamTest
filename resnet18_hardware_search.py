@@ -151,14 +151,7 @@ def evaluate_performance(config):
         result["forwardbackward"]["scme"] = vars(scme)
         result["forwardbackward"]["energy"] = scme["energy"]
         result["forwardbackward"]["latency"] = scme["latency"]
-    except Exception as e:
-        logging.error(f"Error during forward + backward optimization: {e}")
-        print(f"Error during forward + backward optimization: {e}")
-        result["forwardbackward"]["scme"] = 0
-        result["forwardbackward"]["energy"] = 0
-        result["forwardbackward"]["latency"] = 0
 
-    try:
         scme = optimize_allocation_ga(
             hardware=f"{folder}/hardware_config.yaml",
             workload=f"{folder}/forward.onnx",
@@ -174,13 +167,7 @@ def evaluate_performance(config):
         result["forward"]["scme"] = vars(scme)
         result["forward"]["energy"] = scme["energy"]
         result["forward"]["latency"] = scme["latency"]
-    except Exception as e:
-        logging.error(f"Error during forward optimization: {e}")
-        result["forward"]["scme"] = 0
-        result["forward"]["energy"] = 0
-        result["forward"]["latency"] = 0
 
-    try:
         scme = optimize_allocation_ga(
             hardware=f"{folder}/hardware_config.yaml",
             workload=f"{folder}/backward.onnx",
@@ -197,7 +184,16 @@ def evaluate_performance(config):
         result["backward"]["energy"] = scme["energy"]
         result["backward"]["latency"] = scme["latency"]
     except Exception as e:
-        logging.error(f"Error during backward optimization: {e}")
+        logging.error(f"Error: {e}")
+        print(f"Error: {e}")
+        result["forwardbackward"]["scme"] = 0
+        result["forwardbackward"]["energy"] = 0
+        result["forwardbackward"]["latency"] = 0
+
+        result["forward"]["scme"] = 0
+        result["forward"]["energy"] = 0
+        result["forward"]["latency"] = 0
+
         result["backward"]["scme"] = 0
         result["backward"]["energy"] = 0
         result["backward"]["latency"] = 0
@@ -310,7 +306,7 @@ if __name__ == "__main__":
     }
 
     num_task = 10000
-    num_workers = min(num_task, int(os.cpu_count() / 2) + 1)
+    num_workers = min(num_task, int(os.cpu_count() / 3) + 1)
     chunksize = math.ceil(num_task / num_workers)
 
     config_generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
