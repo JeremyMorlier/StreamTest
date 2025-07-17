@@ -311,13 +311,12 @@ if __name__ == "__main__":
 
     num_task = 10000
     num_workers = min(num_task, int(os.cpu_count() / 2) + 1)
-    num_workers = 8
     chunksize = math.ceil(num_task / num_workers)
 
-    config_Generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
+    config_generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
     id = 0
 
-    config_iterator = iter(config_Generator)
+    config_iterator = iter(config_generator)
     r = process_map(evaluate_performance, config_iterator, max_workers=num_workers, chunksize=chunksize)
     print(r)
     # for config in Config_Generator:
