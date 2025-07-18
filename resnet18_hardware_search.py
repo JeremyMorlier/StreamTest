@@ -1,5 +1,5 @@
 import json
-import logging
+import logging as _logging
 import math
 import multiprocessing
 import os
@@ -7,12 +7,15 @@ import random
 import shutil
 from multiprocessing import Pool
 from pathlib import Path
+from typing import Literal
 
 import onnxruntime as ort
 import torch
 from onnxruntime.training import artifacts
 from onnxsim import simplify
 from tqdm.contrib.concurrent import process_map
+from zigzag.mapping.temporal_mapping import TemporalMappingType
+from zigzag.utils import pickle_load, pickle_save
 
 import onnx
 from onnx import shape_inference
@@ -23,7 +26,18 @@ from process_onnx import (
     split_forward_backward,
 )
 from resnet18 import ResNet18
-from stream.api import optimize_allocation_ga
+from stream.api import _sanity_check_inputs
+from stream.cost_model.cost_model import StreamCostModelEvaluation
+from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
+from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
+from stream.stages.generation.layer_stacks_generation import LayerStacksGenerationStage
+from stream.stages.generation.scheduling_order_generation import SchedulingOrderGenerationStage
+from stream.stages.generation.tiled_workload_generation import TiledWorkloadGenerationStage
+from stream.stages.generation.tiling_generation import TilingGenerationStage
+from stream.stages.parsing.accelerator_parser import AcceleratorParserStage
+from stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as StreamONNXModelParserStage
+from stream.stages.set_fixed_allocation_performance import SetFixedAllocationPerformanceStage
+from stream.stages.stage import MainStage
 from stream_hardware_generator import (
     stream_edge_tpu,
     stream_edge_tpu_core,
@@ -31,7 +45,7 @@ from stream_hardware_generator import (
     to_yaml,
 )
 
-logging.basicConfig(level=logging.ERROR)
+_logging.basicConfig(level=_logging.ERROR)
 # Set the logging level to ERROR to suppress warnings
 ort.set_default_logger_severity(3)
 
@@ -46,6 +60,76 @@ def sample_hardware_configs(choices):
         "yPE": random.choice(choices["yPE"]),
     }
     return hardware_config
+
+
+def optimize_allocation_ga_no_id(  # noqa: PLR0913
+    hardware: str,
+    workload: str,
+    mapping: str,
+    mode: Literal["lbl"] | Literal["fused"],
+    layer_stacks: list[tuple[int, ...]],
+    nb_ga_generations: int,
+    nb_ga_individuals: int,
+    output_path: str,
+    skip_if_exists: bool = False,
+    temporal_mapping_type: str = "uneven",
+) -> StreamCostModelEvaluation:
+    _sanity_check_inputs(hardware, workload, mapping, mode, output_path)
+
+    # Create experiment_id path
+    os.makedirs(f"{output_path}", exist_ok=True)
+
+    # Output paths
+    tiled_workload_path = f"{output_path}/tiled_workload.pickle"
+    cost_lut_path = f"{output_path}/cost_lut.pickle"
+    scme_path = f"{output_path}/scme.pickle"
+
+    # Get logger
+    logger = _logging.getLogger(__name__)
+
+    # Determine temporal mapping type for ZigZag
+    if temporal_mapping_type == "uneven":
+        temporal_mapping_type = TemporalMappingType.UNEVEN
+    elif temporal_mapping_type == "even":
+        temporal_mapping_type = TemporalMappingType.EVEN
+    else:
+        raise ValueError(f"Invalid temporal mapping type: {temporal_mapping_type}. Must be 'uneven' or 'even'.")
+
+    # Load SCME if it exists and skip_if_exists is True
+    if os.path.exists(scme_path) and skip_if_exists:
+        scme = pickle_load(scme_path)
+        logger.info(f"Loaded SCME from {scme_path}")
+    else:
+        mainstage = MainStage(
+            [  # Initializes the MainStage as entry point
+                AcceleratorParserStage,  # Parses the accelerator
+                StreamONNXModelParserStage,  # Parses the ONNX Model into the workload
+                LayerStacksGenerationStage,
+                TilingGenerationStage,
+                TiledWorkloadGenerationStage,
+                ZigZagCoreMappingEstimationStage,
+                SetFixedAllocationPerformanceStage,
+                SchedulingOrderGenerationStage,
+                GeneticAlgorithmAllocationStage,
+            ],
+            accelerator=hardware,  # required by AcceleratorParserStage
+            workload_path=workload,  # required by ModelParserStage
+            mapping_path=mapping,  # required by ModelParserStage
+            loma_lpf_limit=6,  # required by LomaEngine
+            nb_ga_generations=nb_ga_generations,  # number of genetic algorithm (ga) generations
+            nb_ga_individuals=nb_ga_individuals,  # number of individuals in each ga generation
+            mode=mode,
+            layer_stacks=layer_stacks,
+            tiled_workload_path=tiled_workload_path,
+            cost_lut_path=cost_lut_path,
+            temporal_mapping_type=temporal_mapping_type,  # required by ZigZagCoreMappingEstimationStage
+            operands_to_prefetch=[],  # required by GeneticAlgorithmAllocationStage
+        )
+        # Launch the MainStage
+        answers = mainstage.run()
+        scme = answers[0][0]
+        pickle_save(scme, scme_path)  # type: ignore
+    return scme
 
 
 class Config_Generator:
@@ -72,6 +156,7 @@ class Config_Generator:
             config["forward_backward"] = f"{self.nn_path}/forward_backward.onnx"
             config["forward"] = f"{self.nn_path}/forward.onnx"
             config["backward"] = f"{self.nn_path}/backward.onnx"
+            config["id"] = str(self.i)
 
             return config
         else:
@@ -91,12 +176,12 @@ def evaluate_performance(config):
     mode = config["mode"]
     id_process = multiprocessing.current_process().name
     id_process = id_process.split("-")[-1]
-    folder = config["path"] + "/" + id_process
+    folder = config["path"] + "/" + id_process + "/" + config["id"]
     Path(folder).mkdir(parents=True, exist_ok=True)
 
     forward_backward_path = config["forward_backward"]
-    forward_path = config["backward"]
-    backward_path = config["forward"]
+    forward_path = config["forward"]
+    backward_path = config["backward"]
 
     # Generate Hardware and Mapping Config
     core = stream_edge_tpu_core(
@@ -137,7 +222,7 @@ def evaluate_performance(config):
     result["backward"] = {}
     # Evaluate Using Stream
     try:
-        scme = optimize_allocation_ga(
+        scme = optimize_allocation_ga_no_id(
             hardware=f"{folder}/hardware_config.yaml",
             workload=f"{folder}/forward_backward.onnx",
             mapping=f"{folder}/mapping_config.yaml",
@@ -153,7 +238,7 @@ def evaluate_performance(config):
         result["forwardbackward"]["energy"] = scme["energy"]
         result["forwardbackward"]["latency"] = scme["latency"]
 
-        scme = optimize_allocation_ga(
+        scme = optimize_allocation_ga_no_id(
             hardware=f"{folder}/hardware_config.yaml",
             workload=f"{folder}/forward.onnx",
             mapping=f"{folder}/mapping_config.yaml",
@@ -185,7 +270,7 @@ def evaluate_performance(config):
         # result["backward"]["energy"] = scme["energy"]
         # result["backward"]["latency"] = scme["latency"]
     except Exception as e:
-        logging.error(f"Error: {e}")
+        _logging.error(f"Error: {e}")
         print(f"Error: {e}")
         result["forwardbackward"]["scme"] = 0
         result["forwardbackward"]["energy"] = 0
@@ -206,14 +291,14 @@ def evaluate_performance(config):
 
 
 if __name__ == "__main__":
-    logger = logging.getLogger(__name__)
+    logger = _logging.getLogger(__name__)
 
-    logging.disable(logging.CRITICAL)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.CRITICAL)
+    _logging.disable(_logging.CRITICAL)
+    stream_handler = _logging.StreamHandler()
+    stream_handler.setLevel(_logging.CRITICAL)
     logger.addHandler(stream_handler)
-    error_handler = logging.FileHandler("error.log")
-    error_handler.setLevel(logging.ERROR)
+    error_handler = _logging.FileHandler("error.log")
+    error_handler.setLevel(_logging.ERROR)
     logger.addHandler(error_handler)
 
     folder = "onnx/"
