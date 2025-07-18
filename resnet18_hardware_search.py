@@ -205,9 +205,9 @@ def evaluate_performance(config):
         ["./pooling.yaml", "./simd.yaml"],
     )
     # Copy Necessary Files
-    shutil.copyfile(f"{folder}/../pooling.yaml", f"{folder}/pooling.yaml")
-    shutil.copyfile(f"{folder}/../simd.yaml", f"{folder}/simd.yaml")
-    shutil.copyfile(f"{folder}/../offchip.yaml", f"{folder}/offchip.yaml")
+    shutil.copyfile(f"{folder}/../../pooling.yaml", f"{folder}/pooling.yaml")
+    shutil.copyfile(f"{folder}/../../simd.yaml", f"{folder}/simd.yaml")
+    shutil.copyfile(f"{folder}/../../offchip.yaml", f"{folder}/offchip.yaml")
     shutil.copyfile(forward_backward_path, f"{folder}/forward_backward.onnx")
     shutil.copyfile(forward_path, f"{folder}/forward.onnx")
     shutil.copyfile(backward_path, f"{folder}/backward.onnx")
