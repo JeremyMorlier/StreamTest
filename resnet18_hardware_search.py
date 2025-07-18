@@ -234,8 +234,8 @@ def evaluate_performance(config):
             skip_if_exists=False,
         )
         result["forwardbackward"]["scme"] = vars(scme)
-        result["forwardbackward"]["energy"] = scme["energy"]
-        result["forwardbackward"]["latency"] = scme["latency"]
+        result["forwardbackward"]["energy"] = scme.energy
+        result["forwardbackward"]["latency"] = scme.latency
 
         scme = optimize_allocation_ga_no_id(
             hardware=f"{folder}/hardware_config.yaml",
@@ -249,8 +249,8 @@ def evaluate_performance(config):
             skip_if_exists=False,
         )
         result["forward"]["scme"] = vars(scme)
-        result["forward"]["energy"] = scme["energy"]
-        result["forward"]["latency"] = scme["latency"]
+        result["forward"]["energy"] = scme.energy
+        result["forward"]["latency"] = scme.latency
 
         # scme = optimize_allocation_ga(
         #     hardware=f"{folder}/hardware_config.yaml",
