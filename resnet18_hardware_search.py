@@ -230,7 +230,6 @@ def evaluate_performance(config):
             layer_stacks=layer_stacks,
             nb_ga_generations=4,
             nb_ga_individuals=4,
-            experiment_id=None,
             output_path=folder,
             skip_if_exists=False,
         )
@@ -246,7 +245,6 @@ def evaluate_performance(config):
             layer_stacks=layer_stacks,
             nb_ga_generations=4,
             nb_ga_individuals=4,
-            experiment_id=None,
             output_path=folder,
             skip_if_exists=False,
         )
