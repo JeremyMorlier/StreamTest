@@ -324,6 +324,11 @@ if __name__ == "__main__":
     mode = "fused"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
 
+    # Copy necessary files for Stream
+    shutil.copyfile("stream/stream/hardware/examples/cores/pooling.yaml", f"{folder}/pooling.yaml")
+    shutil.copyfile("stream/stream/hardware/examples/cores/simd.yaml", f"{folder}/simd.yaml")
+    shutil.copyfile("stream/stream/hardware/examples/cores/offchip.yaml", f"{folder}/offchip.yaml")
+
     model = ResNet18()
     torch_input = torch.randn(4, 3, 32, 32)
     torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
