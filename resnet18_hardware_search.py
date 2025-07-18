@@ -50,6 +50,15 @@ _logging.basicConfig(level=_logging.ERROR)
 ort.set_default_logger_severity(3)
 
 
+def argparser():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Stream Hardware Search for ResNet18")
+    parser.add_argument("--output_path", type=str, default="onnx/output/", help="Path to the output directory")
+
+    return parser.parse_args()
+
+
 def sample_hardware_configs(choices):
     hardware_config = {
         "n_SIMDS": random.choice(choices["n_SIMDS"]),
@@ -194,8 +203,8 @@ def evaluate_performance(config):
         hardware_config["xPE"],
         hardware_config["yPE"],
         "./core.yaml",
-        [pooling_core_path, simd_core_path],
-        offchip_core_path,
+        ["./pooling.yaml", "./simd.yaml"],
+        "./offchip.yaml",
         32,
         0,
     )
@@ -289,6 +298,9 @@ def evaluate_performance(config):
 
 
 if __name__ == "__main__":
+    args = argparser()
+    folder = args.output_path
+
     logger = _logging.getLogger(__name__)
 
     _logging.disable(_logging.CRITICAL)
@@ -299,7 +311,6 @@ if __name__ == "__main__":
     error_handler.setLevel(_logging.ERROR)
     logger.addHandler(error_handler)
 
-    folder = "onnx/"
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
     train_onnx_path = f"{folder}/training_model.onnx"
@@ -308,15 +319,8 @@ if __name__ == "__main__":
     inferred_train_onnx_path3 = f"{folder}/forward_backward.onnx"
 
     output_path = f"{folder}/output"
-
+    Path(output_path).mkdir(parents=True, exist_ok=True)
     # Stream Setups
-    core_path = f"{folder}/core.yaml"
-    # pooling_core_path = os.path.abspath("stream/stream/inputs/examples/hardware/cores/pooling.yaml")
-    # simd_core_path = os.path.abspath("stream/stream/inputs/examples/hardware/cores/simd.yaml")
-    # offchip_core_path = os.path.abspath("stream/stream/inputs/examples/hardware/cores/offchip.yaml")
-    pooling_core_path = "./pooling.yaml"
-    simd_core_path = "./simd.yaml"
-    offchip_core_path = "./offchip.yaml"
     mode = "fused"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
 
@@ -390,7 +394,7 @@ if __name__ == "__main__":
     }
 
     num_task = 10000
-    num_workers = min(num_task, int(os.cpu_count() / 3) + 1)
+    num_workers = min(num_task, int(os.cpu_count() / 2) + 1)
     chunksize = math.ceil(num_task / num_workers)
 
     config_generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
