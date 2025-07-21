@@ -239,7 +239,7 @@ def evaluate_performance(config):
             layer_stacks=layer_stacks,
             nb_ga_generations=4,
             nb_ga_individuals=4,
-            output_path=folder,
+            output_path=f"{folder}/forward_backward",
             skip_if_exists=False,
         )
         result["forwardbackward"]["scme"] = vars(scme)
@@ -254,7 +254,7 @@ def evaluate_performance(config):
             layer_stacks=layer_stacks,
             nb_ga_generations=4,
             nb_ga_individuals=4,
-            output_path=folder,
+            output_path=f"{folder}/forward",
             skip_if_exists=False,
         )
         result["forward"]["scme"] = vars(scme)
