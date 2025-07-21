@@ -393,9 +393,8 @@ if __name__ == "__main__":
         "yPE": [1, 2, 4, 6, 8],
     }
 
-    num_task = 20
-    num_workers = min(num_task, int(os.cpu_count() / 2) + 1)
-    num_workers = 4
+    num_task = 10000
+    num_workers = min(num_task, int(os.cpu_count() / 3) + 1)
     chunksize = math.ceil(num_task / num_workers)
 
     config_generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
