@@ -242,7 +242,6 @@ def evaluate_performance(config):
             output_path=f"{folder}/forward_backward",
             skip_if_exists=False,
         )
-        result["forwardbackward"]["scme"] = vars(scme)
         result["forwardbackward"]["energy"] = scme.energy
         result["forwardbackward"]["latency"] = scme.latency
 
@@ -257,7 +256,6 @@ def evaluate_performance(config):
             output_path=f"{folder}/forward",
             skip_if_exists=False,
         )
-        result["forward"]["scme"] = vars(scme)
         result["forward"]["energy"] = scme.energy
         result["forward"]["latency"] = scme.latency
 
@@ -279,15 +277,12 @@ def evaluate_performance(config):
     except Exception as e:
         _logging.error(f"Error: {e}")
         print(f"Error: {e}")
-        result["forwardbackward"]["scme"] = 0
         result["forwardbackward"]["energy"] = 0
         result["forwardbackward"]["latency"] = 0
 
-        result["forward"]["scme"] = 0
         result["forward"]["energy"] = 0
         result["forward"]["latency"] = 0
 
-        result["backward"]["scme"] = 0
         result["backward"]["energy"] = 0
         result["backward"]["latency"] = 0
 
