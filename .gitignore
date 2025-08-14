@@ -13,3 +13,5 @@ wheels/
 *.onnx
 output/
 onnx/
+onnx*/
+results/
