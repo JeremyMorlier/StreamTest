@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging as _logging
 import math
@@ -13,11 +14,11 @@ import onnxruntime as ort
 import torch
 from onnxruntime.training import artifacts
 from onnxsim import simplify
-from tqdm.contrib.concurrent import process_map
 from zigzag.mapping.temporal_mapping import TemporalMappingType
 from zigzag.utils import pickle_load, pickle_save
 
 import onnx
+from model.resnet18 import ResNet18
 from onnx import shape_inference
 from process_onnx import (
     process_1D_nodes,
@@ -25,7 +26,6 @@ from process_onnx import (
     process_PoolGrad,
     split_forward_backward,
 )
-from resnet18 import ResNet18
 from stream.api import _sanity_check_inputs
 from stream.cost_model.cost_model import StreamCostModelEvaluation
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
@@ -51,8 +51,6 @@ ort.set_default_logger_severity(3)
 
 
 def argparser():
-    import argparse
-
     parser = argparse.ArgumentParser(description="Stream Hardware Search for ResNet18")
     parser.add_argument("--output_path", type=str, default="onnx/output/", help="Path to the output directory")
 
@@ -141,7 +139,7 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
     return scme
 
 
-class Config_Generator:
+class ConfigGenerator:
     def __init__(self, max_iter, hw_choices, mapping_config, hardware_config, path, nn_path):
         self.max_iter = max_iter
         self.i = 0
@@ -181,7 +179,6 @@ class Config_Generator:
 def evaluate_performance(config):
     result = {}
     hardware_config = config["hardware_config"]
-    mapping_config = config["mapping_config"]
     mode = config["mode"]
     id_process = multiprocessing.current_process().name
     id_process = id_process.split("-")[-1]
@@ -397,7 +394,7 @@ if __name__ == "__main__":
     num_workers = min(num_task, int(os.cpu_count() / 3) + 1)
     chunksize = math.ceil(num_task / num_workers)
 
-    config_generator = Config_Generator(num_task, hw_choices, None, None, output_path, nn_path=folder)
+    config_generator = ConfigGenerator(num_task, hw_choices, None, None, output_path, nn_path=folder)
     id = 0
 
     config_iterator = iter(config_generator)

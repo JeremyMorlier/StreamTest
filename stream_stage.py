@@ -1,0 +1,93 @@
+import logging as _logging
+import os
+from typing import Literal
+
+from zigzag.utils import pickle_load, pickle_save
+
+from stream.stream.cost_model.cost_model import StreamCostModelEvaluation
+from stream.stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
+from stream.stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
+from stream.stream.stages.generation.layer_stacks_generation import LayerStacksGenerationStage
+from stream.stream.stages.generation.scheduling_order_generation import SchedulingOrderGenerationStage
+from stream.stream.stages.generation.tiled_workload_generation import (
+    TiledWorkloadGenerationStage,
+)
+from stream.stream.stages.generation.tiling_generation import TilingGenerationStage
+from stream.stream.stages.parsing.accelerator_parser import AcceleratorParserStage
+from stream.stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as StreamONNXModelParserStage
+from stream.stream.stages.set_fixed_allocation_performance import SetFixedAllocationPerformanceStage
+from stream.stream.stages.stage import MainStage
+
+_logging_level = _logging.INFO
+_logging_format = "%(asctime)s - %(funcName)s +%(lineno)s - %(levelname)s - %(message)s"
+_logging.basicConfig(level=_logging_level, format=_logging_format)
+
+
+def _sanity_check_inputs(
+    hardware: str, workload: str, mapping: str, mode: Literal["lbl"] | Literal["fused"], output_path: str
+):
+    assert os.path.exists(hardware), f"Hardware file {hardware} does not exist"
+    assert os.path.exists(workload), f"Workload file {workload} does not exist"
+    assert os.path.exists(mapping), f"Mapping file {mapping} does not exist"
+    assert mode in ["lbl", "fused"], "Mode must be either 'lbl' or 'fused'"
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+
+def optimize_zigzag(
+    hardware: str,
+    workload: str,
+    mapping: str,
+    mode: Literal["lbl"] | Literal["fused"],
+    layer_stacks: list[tuple[int, ...]],
+    nb_ga_generations: int,
+    nb_ga_individuals: int,
+    experiment_id: str,
+    output_path: str,
+    skip_if_exists: bool = False,
+) -> StreamCostModelEvaluation:
+    _sanity_check_inputs(hardware, workload, mapping, mode, output_path)
+
+    # Create experiment_id path
+    os.makedirs(f"{output_path}/{experiment_id}", exist_ok=True)
+
+    # Output paths
+    cost_lut_path = f"{output_path}/{experiment_id}/cost_lut.pickle"
+    scme_path = f"{output_path}/{experiment_id}/scme.pickle"
+
+    # Get logger
+    logger = _logging.getLogger(__name__)
+
+    # Load SCME if it exists and skip_if_exists is True
+    if os.path.exists(scme_path) and skip_if_exists:
+        scme = pickle_load(scme_path)
+        logger.info(f"Loaded SCME from {scme_path}")
+    else:
+        mainstage = MainStage(
+            [  # Initializes the MainStage as entry point
+                AcceleratorParserStage,  # Parses the accelerator
+                StreamONNXModelParserStage,  # Parses the ONNX Model into the workload
+                LayerStacksGenerationStage,
+                TilingGenerationStage,
+                TiledWorkloadGenerationStage,
+                ZigZagCoreMappingEstimationStage,
+                SetFixedAllocationPerformanceStage,
+                SchedulingOrderGenerationStage,
+                GeneticAlgorithmAllocationStage,
+            ],
+            accelerator=hardware,  # required by AcceleratorParserStage
+            workload_path=workload,  # required by ModelParserStage
+            mapping_path=mapping,  # required by ModelParserStage
+            loma_lpf_limit=6,  # required by LomaEngine
+            nb_ga_generations=nb_ga_generations,  # number of genetic algorithm (ga) generations
+            nb_ga_individuals=nb_ga_individuals,  # number of individuals in each ga generation
+            mode=mode,
+            layer_stacks=layer_stacks,
+            cost_lut_path=cost_lut_path,
+            operands_to_prefetch=[],  # required by GeneticAlgorithmAllocationStage
+        )
+        # Launch the MainStage
+        answers = mainstage.run()
+        scme = answers[0][0]
+        pickle_save(scme, scme_path)
+    return scme
