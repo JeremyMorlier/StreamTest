@@ -1,22 +1,19 @@
-import torch
-import torch.nn as nn
+import logging
 
-import onnx
-from onnx import shape_inference
+import torch
 from onnxruntime.training import artifacts
 from onnxsim import simplify
-from stream.api import optimize_allocation_ga
-from stream.utils import CostModelEvaluationLUT
+
+import onnx
+from model.resnet18 import ResNet18
+from onnx import shape_inference
+
 # from stream.visualization.memory_usage import plot_memory_usage
 # from stream.visualization.perfetto import convert_scme_to_perfetto_json
 # from stream.visualization.schedule import visualize_timeline_plotly
-
-from process_onnx import process_convGrad, process_PoolGrad, process_1D_nodes, split_forward_backward, add_optimizer
-import logging
-
-
-import onnxruntime as ort
-from resnet18 import ResNet18
+from process_onnx import add_optimizer, process_1D_nodes, process_convGrad, process_PoolGrad, split_forward_backward
+from stream.api import optimize_allocation_ga
+from stream.utils import CostModelEvaluationLUT
 
 # Set the logging level to ERROR to suppress warnings
 # ort.set_default_logger_severity(4)
@@ -25,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 def run_stream(model_path, accelerator_path, mapping_path, id, output_path):
-    mode = "fused"
+    mode = "lbl"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
 
     # Evaluate Using Stream
@@ -49,6 +46,8 @@ def run_stream(model_path, accelerator_path, mapping_path, id, output_path):
     cost_lut_path = f"{output_path}/{id}/cost_lut.pickle"
     cost_lut = CostModelEvaluationLUT(cost_lut_path)
 
+    with open(f"{output_path}/resultt.txt", "a") as f:
+        f.write(f"{scme.energy}    {scme.latency} \n")
     # # Plotting schedule timeline of best SCME
     # visualize_timeline_plotly(
     #     scme,
@@ -109,7 +108,7 @@ if __name__ == "__main__":
     )
     onnx.save(process_1D_nodes(model_simplified), inferred_train_onnx_path3)
     inferred_model = shape_inference.infer_shapes_path(inferred_train_onnx_path3, inferred_train_onnx_path3)
-
+    # inferred_train_onnx_path3 = inferred_train_onnx_path2
     # Add Optimizer
     optimizer_model, optimizer_inputs, optimizer_outputs = add_optimizer(onnx.load(inferred_train_onnx_path3))
     onnx.save(optimizer_model, inferred_train_onnx_path4)
