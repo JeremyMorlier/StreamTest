@@ -1,18 +1,16 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
 
-import onnx
 from onnx import shape_inference
-from onnxruntime.training import artifacts
-
 from stream.api import optimize_allocation_ga
+
 
 class Reproducer(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(10, 20, (3, 3))
         self.linear2 = nn.Linear(20, 10)
+
     def forward(self, x):
         x = self.conv1(x)
         x = torch.permute(x, (0, 2, 3, 1))
@@ -20,27 +18,30 @@ class Reproducer(nn.Module):
         print(x.shape, (x.shape[0], 10, x.shape[1]))
         x = torch.matmul(torch.ones((x.shape[0], 10, x.shape[1])), x)
         return x
-    
+
+
 class ReproducerTranpose(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(10, 20, (3, 3))
         self.linear2 = nn.Linear(20, 10)
+
     def forward(self, x):
         x = self.conv1(x)
         # x = torch.permute(x, (0, 2, 3, 1))
-        x = torch.reshape(x, (x.shape[0], x.shape[1], x.shape[2]*x.shape[3]))
-        
+        x = torch.reshape(x, (x.shape[0], x.shape[1], x.shape[2] * x.shape[3]))
+
         ones = torch.ones((x.shape[0], x.shape[2], 10))
         print(x.shape, ones.shape)
         x = torch.matmul(x, ones)
         x = torch.permute(x, (0, 2, 1))
         return x
-    
+
+
 if __name__ == "__main__":
     folder = "onnx/error_matmul"
     onnx_path = f"{folder}/test.onnx"
-    infered_path =  f"{folder}/inferred.onnx"
+    infered_path = f"{folder}/inferred.onnx"
     train_onnx_path = f"{folder}/training_model.onnx"
     inferred_train_onnx_path = f"{folder}/infered_training_model.onnx"
     inferred_train_onnx_path2 = f"{folder}/infered_training_model2.onnx"

@@ -1,43 +1,44 @@
 import torch
-import torch.nn as nn
+from torch import nn
 
 from onnx import shape_inference
-
 from stream.api import optimize_allocation_ga
 
-class Gemm_Operator(nn.Module) :
+
+class Gemm_Operator(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(10, 20, (3, 3))
         self.conv2 = nn.Conv2d(20, 40, (3, 3))
         self.m = nn.Softmax(dim=1)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-    def forward(self, x) :
+
+    def forward(self, x):
         x = self.conv2(self.conv1(x))
         x = x + torch.ones(1, 40, 6, 6)
         x = self.avgpool(x)
-        x= x.view(40)
+        x = x.view(40)
         x = x + torch.ones(40)
         return x
-    
+
+
 class Test(nn.Module):
     def __init__(self):
         super().__init__()
         self.mlp1 = nn.Linear(10, 20)
         self.mlp2 = nn.Linear(20, 10)
-        
+
     def forward(self, x):
         x = self.mlp1(x)
         x = self.mlp2(x)
         x = x + 1
         return x
-    
+
 
 if __name__ == "__main__":
-    
     folder = "onnx/"
     onnx_path = f"{folder}/test1Derror.onnx"
-    infered_path =  f"{folder}/inferred1Derror.onnx"
+    infered_path = f"{folder}/inferred1Derror.onnx"
 
     soc_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core.yaml"

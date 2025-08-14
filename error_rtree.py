@@ -1,29 +1,28 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
 
-import onnx
 from onnx import shape_inference
-from onnxruntime.training import artifacts
-
 from stream.api import optimize_allocation_ga
+
 
 class Reproducer(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(10, 20, (3, 3))
         self.linear2 = nn.Linear(20, 10)
+
     def forward(self, x):
         x = torch.matmul(torch.ones(32, 4), x)
         x = torch.softmax(x, 1)
         x = torch.add(torch.ones_like(x), x)
         # x = torch.matmul(torch.ones((x.shape[0], 10, x.shape[1])), x)
         return x
-    
+
+
 if __name__ == "__main__":
     folder = "onnx/error_rtree"
     onnx_path = f"{folder}/test.onnx"
-    infered_path =  f"{folder}/inferred.onnx"
+    infered_path = f"{folder}/inferred.onnx"
 
     soc_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core.yaml"
