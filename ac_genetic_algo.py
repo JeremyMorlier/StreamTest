@@ -7,28 +7,19 @@ import onnx
 import torch
 from onnx import shape_inference
 from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.core.problem import StarmapParallelization
+from pymoo.core.problem import Problem, StarmapParallelization
 from pymoo.operators.crossover.binx import BinomialCrossover
 from pymoo.operators.mutation.bitflip import BitflipMutation
 from pymoo.operators.sampling.rnd import BinaryRandomSampling
 from pymoo.optimize import minimize
-from pymoo.problems import Problem
 from pymoo.visualization.scatter import Scatter
 
 from model.resnet18 import ResNet18
 from process_onnx import (
-    add_optimizer,
-    expand_softmax_grad_node,
-    process_1d_nodes,
-    process_batch_norm,
-    process_concat_nodes,
-    process_convolution_grad,
-    process_poolgrad,
-    shape2tuple,
     split_forward_backward,
 )
+from test_ac import apply_onnx_pass, remove_checkpoint
 from tools import run_stream
-from test_ac import remove_checkpoint, apply_onnx_pass
 
 
 def apply_activation_checkpointing(model, recomputations, forward_inputs, forward_outputs):
