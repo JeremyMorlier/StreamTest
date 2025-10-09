@@ -217,7 +217,7 @@ def stream_edge_tpu(xPEs, yPEs, core, additional_cores, offchip_core, bandwidth,
         for yPE in range(0, yPEs):
             for xPE in range(0, xPEs):
                 i = yPEs * xPEs
-                for additional_coree in additional_cores:
+                for _ in additional_cores:
                     hardware_architecture["core_connectivity"].append(
                         {
                             "type": "link",
@@ -238,6 +238,10 @@ def stream_edge_tpu(xPEs, yPEs, core, additional_cores, offchip_core, bandwidth,
         # hardware_architecture["core_connectivity"].append(f"{i}, {yPEs * xPEs + len(additional_cores)}")
 
     return hardware_architecture
+
+
+# NVIDIA GPUs
+# Tensor Core 8x8x8 bf16
 
 
 def to_yaml(hardware_architecture, path):

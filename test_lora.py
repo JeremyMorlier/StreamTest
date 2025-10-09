@@ -1,12 +1,17 @@
 import logging
 
+import onnx
 import torch
+from onnx import shape_inference
 from onnxruntime.training import artifacts
 from onnxsim import simplify
+from stream.api import optimize_allocation_ga
+from stream.utils import CostModelEvaluationLUT
+from stream.visualization.memory_usage import plot_memory_usage
+from stream.visualization.perfetto import convert_scme_to_perfetto_json
+from stream.visualization.schedule import plot_timeline_brokenaxes
 
-import onnx
 from model.resnet_lora import ResNet18_LoRa
-from onnx import shape_inference
 
 # from stream.visualization.memory_usage import plot_memory_usage
 # from stream.visualization.perfetto import convert_scme_to_perfetto_json
@@ -15,11 +20,10 @@ from process_onnx import (
     add_optimizer,
     process_1d_nodes,
     process_batch_norm,
-    process_convGrad,
+    process_convolution_grad,
     process_poolgrad,
 )
-from stream.api import optimize_allocation_ga
-from stream.utils import CostModelEvaluationLUT
+from tools import apply_onnx_passes, run_stream
 
 # Set the logging level to ERROR to suppress warnings
 # ort.set_default_logger_severity(4)
@@ -53,23 +57,22 @@ def run_stream(model_path, accelerator_path, mapping_path, id, output_path, mode
 
     with open(f"{output_path}/resultt.txt", "a") as f:
         f.write(f"{scme.energy}    {scme.latency} \n")
-    # # Plotting schedule timeline of best SCME
-    # visualize_timeline_plotly(
-    #     scme,
-    #     draw_dependencies=True,
-    #     draw_communication=True,
-    #     fig_path=f"{output_path}/{id}/schedule.html",
-    #     cost_lut=cost_lut,
-    # )
-    # # Plotting memory usage of best SCME
-    # plot_memory_usage(scme, (0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
+    # Plotting schedule timeline of best SCME
+    plot_timeline_brokenaxes(
+        scme,
+        draw_dependencies=True,
+        plot_data_transfer=True,
+        fig_path=f"{output_path}/{id}/schedule.html",
+    )
+    # Plotting memory usage of best SCME
+    plot_memory_usage(scme, (0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
 
-    # # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
-    # convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
+    # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
+    convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
 
 
 if __name__ == "__main__":
-    folder = "onnx2/"
+    folder = "results/lora_resnet18/"
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
     train_onnx_path = f"{folder}/training_model.onnx"
@@ -81,7 +84,7 @@ if __name__ == "__main__":
     inferred_train_onnx_path6 = f"{folder}/infered_training_model6.onnx"
     soc_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_ga.yaml"
-    output_path = f"{folder}/output/result"
+    output_path = "results/not_lora_resnet18/"
 
     # Generate, Export and Infer Shapes of a ResNet18 Model
     # model = ResNet18()
@@ -99,50 +102,60 @@ if __name__ == "__main__":
     # Generate Backward
     base_model = onnx.load(infered_path)
     inits = base_model.graph.initializer
-
-    def apply_onnxpass(onnx_model, init_grad):
-        # Retrieve ONNX training graph with onnxruntime
-        requires_grad = []
-        for init in inits:
+    requires_grad = []
+    for init in inits:
+        if "delta" in init.name:
             requires_grad.append(init.name)
-        loss = artifacts.LossType(2)
-        artifacts.generate_artifacts(
-            base_model, requires_grad=requires_grad, loss=loss, optimizer=artifacts.OptimType.AdamW, prefix=folder
-        )
+    loss = artifacts.LossType(2)
 
-        # Multiple shapes inference pass are needed
-        inferred_model = shape_inference.infer_shapes(onnx.load(train_onnx_path))
-        inferred_model = shape_inference.infer_shapes(inferred_model)
-        inferred_model = shape_inference.infer_shapes(inferred_model)
+    inferred_train_onnx_path4, _, _, _ = apply_onnx_passes(
+        base_model, None, output_path, requires_grad, "onnx", check=False
+    )
+    run_stream(inferred_train_onnx_path4, soc_path, mapping_path, id=3, output_path=output_path, mode="fused")
 
-        processed_model1 = process_convGrad(process_poolgrad(inferred_model))
-        onnx.save(processed_model1, inferred_train_onnx_path2)
+    # def apply_onnxpass(onnx_model, init_grad):
+    #     # Retrieve ONNX training graph with onnxruntime
+    #     requires_grad = []
+    #     for init in inits:
+    #         requires_grad.append(init.name)
+    #     loss = artifacts.LossType(2)
+    #     artifacts.generate_artifacts(
+    #         base_model, requires_grad=requires_grad, loss=loss, optimizer=artifacts.OptimType.AdamW, prefix=folder
+    #     )
 
-        inferred_model2 = shape_inference.infer_shapes(processed_model1)
-        inferred_model2 = shape_inference.infer_shapes(inferred_model2)
+    #     # Multiple shapes inference pass are needed
+    #     inferred_model = shape_inference.infer_shapes(onnx.load(train_onnx_path))
+    #     inferred_model = shape_inference.infer_shapes(inferred_model)
+    #     inferred_model = shape_inference.infer_shapes(inferred_model)
 
-        model_simplified, check = simplify(inferred_model2, skipped_optimizers=["extract_constant_to_initializer"])
+    #     processed_model1 = process_convolution_grad(process_poolgrad(inferred_model))
+    #     onnx.save(processed_model1, inferred_train_onnx_path2)
 
-        process2 = process_batch_norm(model_simplified)
-        process2 = shape_inference.infer_shapes(process2)
-        process2 = shape_inference.infer_shapes(process2)
-        onnx.save(process2, inferred_train_onnx_path3)
-        print(onnx.checker.check_model(process2))
+    #     inferred_model2 = shape_inference.infer_shapes(processed_model1)
+    #     inferred_model2 = shape_inference.infer_shapes(inferred_model2)
 
-        process3 = process_1d_nodes(process2)
-        process3 = shape_inference.infer_shapes(process3)
-        onnx.save(process3, inferred_train_onnx_path4)
-        print(onnx.checker.check_model(process3))
+    #     model_simplified, check = simplify(inferred_model2, skipped_optimizers=["extract_constant_to_initializer"])
 
-        # Add Optimizer
-        optimizer_model, optimizer_inputs, optimizer_outputs = add_optimizer(process3)
-        onnx.save(optimizer_model, inferred_train_onnx_path5)
+    #     process2 = process_batch_norm(model_simplified)
+    #     process2 = shape_inference.infer_shapes(process2)
+    #     process2 = shape_inference.infer_shapes(process2)
+    #     onnx.save(process2, inferred_train_onnx_path3)
+    #     print(onnx.checker.check_model(process2))
 
-        shape_inference.infer_shapes_path(inferred_train_onnx_path5, inferred_train_onnx_path5)
-        print(onnx.checker.check_model(inferred_train_onnx_path5))
-        run_stream(inferred_train_onnx_path5, soc_path, mapping_path, "forwardbackward", output_path, mode="fused")
+    #     process3 = process_1d_nodes(process2)
+    #     process3 = shape_inference.infer_shapes(process3)
+    #     onnx.save(process3, inferred_train_onnx_path4)
+    #     print(onnx.checker.check_model(process3))
 
-    apply_onnxpass(base_model, inits)
+    #     # Add Optimizer
+    #     optimizer_model, optimizer_inputs, optimizer_outputs = add_optimizer(process3)
+    #     onnx.save(optimizer_model, inferred_train_onnx_path5)
+
+    #     shape_inference.infer_shapes_path(inferred_train_onnx_path5, inferred_train_onnx_path5)
+    #     print(onnx.checker.check_model(inferred_train_onnx_path5))
+    #     # run_stream(inferred_train_onnx_path5, soc_path, mapping_path, "forwardbackward", output_path, mode="fused")
+
+    # apply_onnxpass(base_model, inits)
     # # Split Forward, Backward and Optimizer
     # onnx_model = onnx.load(inferred_train_onnx_path3)
     # forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(onnx_model)

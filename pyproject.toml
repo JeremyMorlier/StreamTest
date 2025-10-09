@@ -12,7 +12,11 @@ dependencies = [
     "stream-dse",
     "torch>=2.7.0",
     "onnxsim>=0.4.36",
-    "uv"
+    "uv",
+    "transformers>=4.55.3",
+    "optimum[onnx]>=1.27.0",
+    "onnx==1.18.0",
+    "pymoo>=0.6.1.5",
 ]
 
 [tool.uv.sources]

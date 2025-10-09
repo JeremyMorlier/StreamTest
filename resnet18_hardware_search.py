@@ -10,22 +10,12 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Literal
 
+import onnx
 import onnxruntime as ort
 import torch
+from onnx import shape_inference
 from onnxruntime.training import artifacts
 from onnxsim import simplify
-from zigzag.mapping.temporal_mapping import TemporalMappingType
-from zigzag.utils import pickle_load, pickle_save
-
-import onnx
-from model.resnet18 import ResNet18
-from onnx import shape_inference
-from process_onnx import (
-    process_1D_nodes,
-    process_convGrad,
-    process_PoolGrad,
-    split_forward_backward,
-)
 from stream.api import _sanity_check_inputs
 from stream.cost_model.cost_model import StreamCostModelEvaluation
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
@@ -38,11 +28,21 @@ from stream.stages.parsing.accelerator_parser import AcceleratorParserStage
 from stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as StreamONNXModelParserStage
 from stream.stages.set_fixed_allocation_performance import SetFixedAllocationPerformanceStage
 from stream.stages.stage import MainStage
-from stream_hardware_generator import (
+from zigzag.mapping.temporal_mapping import TemporalMappingType
+from zigzag.utils import pickle_load, pickle_save
+
+from hardware_gen.stream_hardware_generator import (
     stream_edge_tpu,
     stream_edge_tpu_core,
     stream_edge_tpu_mapping,
     to_yaml,
+)
+from model.resnet18 import ResNet18
+from process_onnx import (
+    process_1D_nodes,
+    process_convGrad,
+    process_PoolGrad,
+    split_forward_backward,
 )
 
 _logging.basicConfig(level=_logging.ERROR)
