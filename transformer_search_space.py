@@ -167,6 +167,7 @@ class ConfigGenerator:
 
 
 def evaluate_performance(config):
+    print(config)
     result = {}
     hardware_config = config["hardware_config"]
     mode = config["mode"]
