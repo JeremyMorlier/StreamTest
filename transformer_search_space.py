@@ -167,13 +167,12 @@ class ConfigGenerator:
 
 
 def evaluate_performance(config):
-    print(config)
     result = {}
     hardware_config = config["hardware_config"]
     mode = config["mode"]
     id_process = multiprocessing.current_process().name
     id_process = id_process.split("-")[-1]
-    folder = config["path"] + "/" + id_process + "/" + config["id"]
+    folder = config["path"] + id_process + "/" + config["id"]
     Path(folder).mkdir(parents=True, exist_ok=True)
 
     forward_backward_path = config["training"]
@@ -238,9 +237,7 @@ def evaluate_performance(config):
 
         result["forward"]["energy"] = 0
         result["forward"]["latency"] = 0
-
-        result["backward"]["energy"] = 0
-        result["backward"]["latency"] = 0
+        result["ererfe"]["efeez"] = 0
 
     with open(f"{folder}/resultt.txt", "a") as f:
         json.dump(result, f)
@@ -333,7 +330,6 @@ if __name__ == "__main__":
     )
     id = 0
 
-    print(num_task, num_workers, chunksize)
     config_iterator = iter(config_generator)
     with Pool(processes=num_workers) as pool:
         r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)

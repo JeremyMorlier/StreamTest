@@ -6,6 +6,7 @@ import os
 def generate_core(xpes: int = 256, ypes: int = 256):
     yaml_data = {
         "name": "generic_array",
+        "type": "compute",
         "memories": {
             "rf_I": {
                 "size": 32,
@@ -126,14 +127,14 @@ def generate_offchip():
                         "bandwidth_min": 64,
                         "bandwidth_max": 64,
                         "allocation": [
-                            ["I1, fh"],
-                            ["I1, tl"],
-                            ["I2, fh"],
-                            ["I2, tl"],
-                            ["O, fh"],
-                            ["O, tl"],
-                            ["O, fl"],
-                            ["O, th"],
+                            "I1, fh",
+                            "I1, tl",
+                            "I2, fh",
+                            "I2, tl",
+                            "O, fh",
+                            "O, tl",
+                            "O, fl",
+                            "O, th",
                         ],
                     }
                 ],
@@ -169,9 +170,9 @@ def generate_buffer(size: int = 268435456, bandwidth_min: int = 256, bandwidth_m
                         "bandwidth_min": bandwidth_min,
                         "bandwidth_max": bandwidth_max,
                         "allocation": [
-                            ["I1, tl"],
-                            ["O, tl"],
-                            ["O, th"],
+                            "I1, tl",
+                            "O, tl",
+                            "O, th",
                         ],
                     },
                     {
@@ -180,9 +181,9 @@ def generate_buffer(size: int = 268435456, bandwidth_min: int = 256, bandwidth_m
                         "bandwidth_min": bandwidth_min,
                         "bandwidth_max": bandwidth_max,
                         "allocation": [
-                            ["I2, tl"],
-                            ["O, tl"],
-                            ["O, th"],
+                            "I2, tl",
+                            "O, tl",
+                            "O, th",
                         ],
                     },
                     {
@@ -191,9 +192,9 @@ def generate_buffer(size: int = 268435456, bandwidth_min: int = 256, bandwidth_m
                         "bandwidth_min": bandwidth_min,
                         "bandwidth_max": bandwidth_max,
                         "allocation": [
-                            ["I1, fh"],
-                            ["O, fh"],
-                            ["O, fl"],
+                            "I1, fh",
+                            "O, fh",
+                            "O, fl",
                         ],
                     },
                     {
@@ -202,9 +203,9 @@ def generate_buffer(size: int = 268435456, bandwidth_min: int = 256, bandwidth_m
                         "bandwidth_min": bandwidth_min,
                         "bandwidth_max": bandwidth_max,
                         "allocation": [
-                            ["I2, fh"],
-                            ["O, fh"],
-                            ["O, fl"],
+                            "I2, fh",
+                            "O, fh",
+                            "O, fl",
                         ],
                     },
                 ],
@@ -240,10 +241,10 @@ def generate_simd(npes: int = 64):
                         "bandwidth_min": 512,
                         "bandwidth_max": 512,
                         "allocation": [
-                            ["I1, fh"],
-                            ["I2, fh"],
-                            ["O, fh"],
-                            ["O, fl"],
+                            "I1, fh",
+                            "I2, fh",
+                            "O, fh",
+                            "O, fl",
                         ],
                     },
                     {
@@ -252,10 +253,10 @@ def generate_simd(npes: int = 64):
                         "bandwidth_min": 512,
                         "bandwidth_max": 512,
                         "allocation": [
-                            ["I1, tl"],
-                            ["I2, tl"],
-                            ["O, tl"],
-                            ["O, th"],
+                            "I1, tl",
+                            "I2, tl",
+                            "O, tl",
+                            "O, th",
                         ],
                     },
                 ],
@@ -268,7 +269,7 @@ def generate_simd(npes: int = 64):
             "dimensions": ["D1"],
             "sizes": [npes],
         },
-        "dataflows": {"D1": [["K", npes]]},
+        "dataflows": {"D1": [f"K, {npes}"]},
     }
     return yaml_data
 
