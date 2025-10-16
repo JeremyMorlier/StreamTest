@@ -261,9 +261,9 @@ if __name__ == "__main__":
     error_handler.setLevel(_logging.ERROR)
     logger.addHandler(error_handler)
 
-    onnx_path = f"{folder}/test.onnx"
-    infered_path = f"{folder}/inferred.onnx"
-    output_path = f"{folder}/output"
+    onnx_path = os.path.join(folder, "test.onnx")
+    infered_path = os.path.join(folder, "inferred.onnx")
+    output_path = os.path.join(folder, "output")
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
     # Stream Setup

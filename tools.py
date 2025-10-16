@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import onnx
@@ -78,7 +79,7 @@ def run_stream(
     #     logging.error(f"Error during optimization: {e}")
 
     # Load in the CostModelEvaluationLUT from the run
-    cost_lut_path = f"{output_path}/{id}/cost_lut.pickle"
+    cost_lut_path = os.path.join(output_path, "/{id}/cost_lut.pickle")
     cost_lut = CostModelEvaluationLUT(cost_lut_path)
     print(scme.latency, type(scme.latency))
     with open(f"{output_path}/resultt.txt", "a") as f:
@@ -105,19 +106,19 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
     # Output Paths to store intermediary models
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
-    onnx_path = f"{output_path}/model.onnx"
-    train_onnx_path = f"{output_path}/training_model.onnx"
+    onnx_path = os.path.join(output_path, "model.onnx")
+    train_onnx_path = os.path.join(output_path, "training_model.onnx")
 
-    inferred_train_onnx_path1 = f"{output_path}/model1.onnx"
-    inferred_train_onnx_path2 = f"{output_path}/model2.onnx"
-    inferred_train_onnx_path3 = f"{output_path}/model3.onnx"
-    inferred_train_onnx_path4 = f"{output_path}/model4.onnx"
-    inferred_train_onnx_path5 = f"{output_path}/model5.onnx"
+    inferred_train_onnx_path1 = os.path.join(output_path, "model1.onnx")
+    inferred_train_onnx_path2 = os.path.join(output_path, "model2.onnx")
+    inferred_train_onnx_path3 = os.path.join(output_path, "model3.onnx")
+    inferred_train_onnx_path4 = os.path.join(output_path, "model4.onnx")
+    inferred_train_onnx_path5 = os.path.join(output_path, "model5.onnx")
 
     # submodels paths
-    forward_onnx_path = f"{output_path}/forward.onnx"
-    backward_onnx_path = f"{output_path}/backward.onnx"
-    optimizer_onnx_path = f"{output_path}/optimizer.onnx"
+    forward_onnx_path = os.path.join(output_path, "forward.onnx")
+    backward_onnx_path = os.path.join(output_path, "backward.onnx")
+    optimizer_onnx_path = os.path.join(output_path, "optimizer.onnx")
 
     # Export Torch Model to ONNX
     if "torch" in mode:
