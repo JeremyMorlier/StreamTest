@@ -84,9 +84,9 @@ def split_forward_backward(onnx_model):
                 if j >= sep_index:
                     for output_name in op_node.output:
                         if output_name in op_node2.input:
-                            if output_name not in forward_outputs:
+                            if output_name not in [name for name, _ in forward_outputs]:
                                 forward_outputs.append([output_name, op_node2])
-                            if output_name not in backward_inputs:
+                            if output_name not in [name for name, _ in backward_inputs]:
                                 backward_inputs.append([output_name, op_node])
 
     for i, op_node in enumerate(onnx_model.graph.node):

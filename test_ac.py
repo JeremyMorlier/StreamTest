@@ -223,7 +223,6 @@ def remove_checkpoint(onnx_model, checkpoint, all_checkpoints, inputs):
     search_output_onnx_model(checkpoint)
     copy_nodes_in_onnx_model(onnx_model, [node.name for node in computation_nodes], checkpoint, output_node.name)
     compute_cost = get_compute_cost(onnx_model, [node.name for node in computation_nodes])
-    # print([node.name for node in computation_nodes])
     return shape_inference.infer_shapes(onnx_model), compute_cost
 
 
@@ -240,6 +239,7 @@ def apply_onnx_pass(output_path="./", check=True, model=None):
     backward_onnx_path = f"{output_path}/backward.onnx"
     optimizer_onnx_path = f"{output_path}/optimizer.onnx"
 
+    # Can not check before adding the domain to the PoolGrad nodes
     processed_model1 = process_poolgrad(model)
     onnx.checker.check_model(processed_model1)
     processed_model1 = process_convolution_grad(processed_model1)
@@ -350,25 +350,24 @@ def apply_activation_checkpointing(
     onnx.save(inferred_model, train_onnx_path)
 
     forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(inferred_model)
-    print([checkpoint[0] for checkpoint in forward_outputs])
     for i, checkpoint in enumerate(forward_outputs[1:-1]):
         inferred_model = onnx.load(train_onnx_path)
         checkpointed_model, compute_cost = remove_checkpoint(
-            inferred_model, checkpoint, forward_inputs, forward_outputs
+            inferred_model, checkpoint, forward_outputs, forward_inputs
         )
         print(compute_cost)
         onnx.save(checkpointed_model, f"{folder}ac_{i}.onnx")
 
-        inferred_train_onnx_path4, forward_onnx_path, backward_onnx_path, optimizer_onnx_path = apply_onnx_pass(
-            output_path=f"{folder}ac_{i}/", model=checkpointed_model
-        )
-        run_stream(
-            inferred_train_onnx_path4,
-            accelerator_path=accelerator_path,
-            mapping_path=mapping_path,
-            id=1,
-            output_path=f"{folder}ac_{i}/",
-        )
+        # inferred_train_onnx_path4, forward_onnx_path, backward_onnx_path, optimizer_onnx_path = apply_onnx_pass(
+        #     output_path=f"{folder}ac_{i}/", model=checkpointed_model
+        # )
+        # run_stream(
+        #     inferred_train_onnx_path4,
+        #     accelerator_path=accelerator_path,
+        #     mapping_path=mapping_path,
+        #     id=1,
+        #     output_path=f"{folder}ac_{i}/",
+        # )
 
 
 def run_stream(model_path, accelerator_path, mapping_path, id, output_path):
