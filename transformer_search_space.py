@@ -146,7 +146,7 @@ class ConfigGenerator:
         config = {}
         if self.i < self.max_iter:
             self.i += 1
-
+            print(self.i)
             config["hardware_config"] = sample_hardware_configs(self.hw_choices)
             config["mapping_config"] = self.mapping_config
             config["path"] = self.path
