@@ -263,7 +263,7 @@ if __name__ == "__main__":
 
     onnx_path = os.path.join(folder, "test.onnx")
     infered_path = os.path.join(folder, "inferred.onnx")
-    output_path = os.path.join(folder, "output")
+    output_path = os.path.join(folder, "output/")
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
     # Stream Setup

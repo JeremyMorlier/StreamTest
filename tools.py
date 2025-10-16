@@ -119,7 +119,6 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
     forward_onnx_path = os.path.join(output_path, "forward.onnx")
     backward_onnx_path = os.path.join(output_path, "backward.onnx")
     optimizer_onnx_path = os.path.join(output_path, "optimizer.onnx")
-
     # Export Torch Model to ONNX
     if "torch" in mode:
         onnx_model = torch.onnx.export(torch_model, example_input, onnx_path, opset_version=13, export_params=False)
