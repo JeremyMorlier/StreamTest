@@ -49,12 +49,12 @@ def argparser():
 
 def sample_hardware_configs(choices):
     hardware_config = {
-        "n_SIMDS": random.choice(choices["n_SIMDS"]),
-        "n_computes_lanes": random.choice(choices["n_computes_lanes"]),
-        "PE_Memory": random.choice(choices["PE_Memory"]),
-        "register_file_size": random.choice(choices["register_file_size"]),
-        "xPE": random.choice(choices["xPE"]),
-        "yPE": random.choice(choices["yPE"]),
+        "XPEs": random.choice(choices["XPEs"]),
+        "YPEs": random.choice(choices["YPEs"]),
+        "VectorPEs": random.choice(choices["VectorPEs"]),
+        "BufferBandwidth": random.choice(choices["BufferBandwidth"]),
+        "BufferSize": random.choice(choices["BufferSize"]),
+        "OffchipBandwidth": random.choice(choices["OffchipBandwidth"]),
     }
     return hardware_config
 
