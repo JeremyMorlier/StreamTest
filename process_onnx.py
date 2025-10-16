@@ -244,16 +244,10 @@ def process_convolution_grad(onnx_model):
             )
             node_list.append(node_input_grad)
 
-            initializer_list.append(
-                make_initializer(
-                    "shape_axis" + op_node.name,
-                    [input_grad_shape[0], input_grad_shape[1], input_grad_shape[2] * input_grad_shape[3]],
-                    np.int64,
-                )
-            )
-
             # Compute the gradient relative to the weight
             if len(op_node.output[1]) > 0:
+                weight_gradient_name = "_WG_" + op_node.output[1] + "_" + op_node.name
+
                 sliding_window_h = (
                     input_shape[2] + 2 * padding[0] - dilations[0] * (kernel_shape[0] - 1) - 1
                 ) // strides[0] + 1
@@ -265,6 +259,15 @@ def process_convolution_grad(onnx_model):
                     sliding_window_h * sliding_window_w,
                     input_shape[1] * kernel_shape[0] * kernel_shape[1],
                 ]
+
+                initializer_list.append(
+                    make_initializer(
+                        "shape_axis" + weight_gradient_name,
+                        [input_grad_shape[0], input_grad_shape[1], input_grad_shape[2] * input_grad_shape[3]],
+                        np.int64,
+                    )
+                )
+
                 if op_node.input[1] != onnx_model.graph.input[0].name:
                     # Add padding if necessary
                     if max(padding) > 0:
@@ -272,20 +275,20 @@ def process_convolution_grad(onnx_model):
                         padding_value_node = helper.make_node(
                             "Constant",
                             inputs=[],
-                            outputs=["paddings_" + op_node.name],
+                            outputs=["WG_paddings_" + weight_gradient_name],
                             value=numpy_helper.from_array(pads),
                         )
                         pad_node = helper.make_node(
                             "Pad",
-                            inputs=[op_node.input[1], "paddings_" + op_node.name],
-                            outputs=["padded_input" + op_node.name],
+                            inputs=[op_node.input[1], "WG_paddings_" + weight_gradient_name],
+                            outputs=["padded_input" + weight_gradient_name],
                             mode="constant",
-                            name=op_node.name + "_PaddingActivation",
+                            name=weight_gradient_name + "_PaddingActivation",
                         )
 
                         node_list.append(padding_value_node)
                         node_list.append(pad_node)
-                        input_name = "padded_input" + op_node.name
+                        input_name = "padded_input" + weight_gradient_name
                     else:
                         input_name = op_node.input[1]
 
@@ -296,13 +299,13 @@ def process_convolution_grad(onnx_model):
                     h_indices_constant_node = helper.make_node(
                         "Constant",
                         inputs=[],
-                        outputs=["h_indices_" + op_node.name],
+                        outputs=["h_indices_" + weight_gradient_name],
                         value=numpy_helper.from_array(h_indices),
                     )
                     w_indices_constant_node = helper.make_node(
                         "Constant",
                         inputs=[],
-                        outputs=["w_indices_" + op_node.name],
+                        outputs=["w_indices_" + weight_gradient_name],
                         value=numpy_helper.from_array(w_indices),
                     )
                     node_list.append(h_indices_constant_node)
@@ -311,24 +314,24 @@ def process_convolution_grad(onnx_model):
                     # Unfold Operation
                     gather_node_h = make_node(
                         "Gather",
-                        [input_name, "h_indices_" + op_node.name],
-                        ["h_gathered" + op_node.name],
+                        [input_name, "h_indices_" + weight_gradient_name],
+                        ["h_gathered" + weight_gradient_name],
                         axis=2,
-                        name=op_node.name + "_GatherWeight1",
+                        name=weight_gradient_name + "_GatherWeight1",
                     )
                     gather_node_w = make_node(
                         "Gather",
-                        ["h_gathered" + op_node.name, "w_indices_" + op_node.name],
-                        ["w_h_gathered" + op_node.name],
+                        ["h_gathered" + weight_gradient_name, "w_indices_" + weight_gradient_name],
+                        ["w_h_gathered" + weight_gradient_name],
                         axis=4,
-                        name=op_node.name + "_GatherWeight2",
+                        name=weight_gradient_name + "_GatherWeight2",
                     )
                     transpose_node_gather = make_node(
                         "Transpose",
-                        ["w_h_gathered" + op_node.name],
-                        ["gathered_c" + op_node.name],
+                        ["w_h_gathered" + weight_gradient_name],
+                        ["gathered_c" + weight_gradient_name],
                         perm=[0, 3, 5, 4, 1, 2],
-                        name=op_node.name + "_TransposeWeight1",
+                        name=weight_gradient_name + "_TransposeWeight1",
                     )
 
                     node_list.append(gather_node_h)
@@ -336,37 +339,42 @@ def process_convolution_grad(onnx_model):
                     node_list.append(transpose_node_gather)
 
                     # Create reshape node
-                    initializer_list.append(make_initializer("shape_axis2" + op_node.name, transposed_shape, np.int64))
+                    initializer_list.append(
+                        make_initializer("shape_axis2" + weight_gradient_name, transposed_shape, np.int64)
+                    )
                     reshape_node = helper.make_node(
                         "Reshape",
-                        inputs=["gathered_c" + op_node.name, "shape_axis2" + op_node.name],
-                        outputs=["transpose1_output1_" + op_node.name],
-                        name=op_node.name + "Reshape_Axis2",
+                        inputs=["gathered_c" + weight_gradient_name, "shape_axis2" + weight_gradient_name],
+                        outputs=["transpose1_output1_" + weight_gradient_name],
+                        name=weight_gradient_name + "Reshape_Axis2",
                     )
                     node_list.append(reshape_node)
                 else:
                     transposed_input = make_tensor_value_info(
-                        "transpose1_output1_" + op_node.name, TensorProto.FLOAT, transposed_shape
+                        "transpose1_output1_" + weight_gradient_name, TensorProto.FLOAT, transposed_shape
                     )
                     input_list.append(transposed_input)
 
                 node_reshape = make_node(
-                    "Reshape", [op_node.input[0], "shape_axis" + op_node.name], ["shape" + op_node.name]
+                    "Reshape",
+                    inputs=[op_node.input[0], "shape_axis" + weight_gradient_name],
+                    outputs=["shape" + weight_gradient_name],
+                    name=weight_gradient_name + "Reshape_Axis",
                 )
                 node_list.append(node_reshape)
                 node_matmul = make_node(
                     "MatMul",
-                    ["shape" + op_node.name, "transpose1_output1_" + op_node.name],
-                    ["matmul_output_" + op_node.name],
-                    name=op_node.name + "_MatMul",
+                    ["shape" + weight_gradient_name, "transpose1_output1_" + weight_gradient_name],
+                    ["matmul_output_" + weight_gradient_name],
+                    name=weight_gradient_name + "_MatMul",
                 )
                 node_list.append(node_matmul)
-                initializer_list.append(make_initializer("ReduceSumTensor1" + op_node.name, [0], np.int64))
+                initializer_list.append(make_initializer("ReduceSumTensor1" + weight_gradient_name, [0], np.int64))
                 node_sum = make_node(
                     "ReduceSum",
-                    ["matmul_output_" + op_node.name, "ReduceSumTensor1" + op_node.name],
-                    ["batch_sum" + op_node.name],
-                    name=op_node.name + "_ReduceSumWeight",
+                    ["matmul_output_" + weight_gradient_name, "ReduceSumTensor1" + weight_gradient_name],
+                    ["batch_sum" + weight_gradient_name],
+                    name=weight_gradient_name + "_ReduceSumWeight",
                     keepdims=0,
                 )
                 node_list.append(node_sum)
@@ -374,17 +382,17 @@ def process_convolution_grad(onnx_model):
                 node_reshape_axis3 = make_node(
                     "Constant",
                     [],
-                    ["shape_axis3" + op_node.name],
+                    ["shape_axis3" + weight_gradient_name],
                     value=numpy_helper.from_array(
                         np.array([weight_shape[0], weight_shape[1], weight_shape[2], weight_shape[3]], dtype=np.int64)
                     ),
-                    name=op_node.name + "_Constant",
+                    name=weight_gradient_name + "_Constant",
                 )
                 node_reshape2 = make_node(
                     "Reshape",
-                    ["batch_sum" + op_node.name, "shape_axis3" + op_node.name],
+                    ["batch_sum" + weight_gradient_name, "shape_axis3" + weight_gradient_name],
                     [op_node.output[1]],
-                    name=op_node.name + "_Reshape_Axis3",
+                    name=weight_gradient_name + "_Reshape_Axis3",
                 )
                 node_list.append(node_reshape_axis3)
                 node_list.append(node_reshape2)

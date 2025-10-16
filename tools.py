@@ -20,6 +20,7 @@ from process_onnx import (
     split_forward_backward,
 )
 
+
 def get_max_offchip_memory(scme):
     """
     Recovers the maximum memory attained in offchip memory for a given SCME object.
@@ -45,10 +46,20 @@ def get_max_offchip_memory(scme):
     # If not found, return None or raise
     return None
 
-def run_stream(model_path, accelerator_path, mapping_path, id, output_path, mode="fused"):
-    Path(output_path, str(id)).mkdir(parents=True, exist_ok=True)
-    layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
 
+def run_stream(
+    model_path,
+    accelerator_path,
+    mapping_path,
+    id,
+    output_path,
+    mode="fused",
+    layer_stacks=None,
+):
+    Path(output_path, str(id)).mkdir(parents=True, exist_ok=True)
+
+    # if layer_stacks is None:
+    #     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
     # Evaluate Using Stream
     # try :
     scme = optimize_allocation_ga(
