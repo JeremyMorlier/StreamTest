@@ -298,10 +298,10 @@ def generate_soc(
     yaml_data = {
         "name": "fusemax_like",
         "cores": {
-            "0": core_filename,
-            "1": simd_filename,
-            "2": buffer_filename,
-            "3": offchip_filename,
+            0: core_filename,
+            1: simd_filename,
+            2: buffer_filename,
+            3: offchip_filename,
         },
         "offchip_core_id": 3,
         "unit_energy_cost": 0,
