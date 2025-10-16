@@ -331,6 +331,8 @@ if __name__ == "__main__":
     id = 0
 
     config_iterator = iter(config_generator)
+    for config in config_iterator:
+        evaluate_performance(config)
     with Pool(processes=num_workers) as pool:
         r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
         print(r)
