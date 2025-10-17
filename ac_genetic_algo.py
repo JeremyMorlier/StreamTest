@@ -5,6 +5,7 @@ from os import getpid
 from pathlib import Path
 import csv
 import onnx
+import random
 import torch
 from onnx import shape_inference
 from onnxruntime.training import artifacts
@@ -28,6 +29,7 @@ from tools import run_stream
 def apply_activation_checkpointing(model, recomputations, forward_outputs, forward_inputs):
     for recomputation in recomputations:
         model, compute_cost = remove_checkpoint(model, recomputation, forward_outputs, forward_inputs)
+        forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(model)
     return model
 
 
@@ -51,7 +53,7 @@ class ActivationCheckpointingProblem(Problem):
         self.forward_inputs = forward_inputs
         self.forward_outputs = forward_outputs
 
-        # Parralelization
+        # Parallelization
         self.processes = processes
 
         super().__init__(
@@ -71,9 +73,9 @@ class ActivationCheckpointingProblem(Problem):
         shutil.copyfile(model_path, f"{folder}model.onnx")
         # Generate the ONNX based on X
         recomputations = []
-        for variable, activations in zip(x, self.optimization_vars, strict=True):
+        for variable, activations in zip(x, optimization_vars, strict=True):
             if variable:
-                recomputations.append(activations)
+                recomputations.append([activations, optimization_vars[activations]])
 
         onnx_model = onnx.load(f"{folder}model.onnx")
         checkpointed_model = apply_activation_checkpointing(
@@ -131,9 +133,29 @@ def generate_model(output_path):
 
     forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(inferred_model)
     # The input and the loss is not an activation to be checkpointed
-    optimization_vars = forward_outputs[1:-1]
-
+    optimization_vars = {}
+    for key, item in forward_outputs.items():
+        if "lazy_reset" not in key and "loss" not in key and "prob" not in key:
+            optimization_vars[key] = item
     return optimization_vars, train_onnx_path, forward_inputs, forward_outputs
+
+
+def test(output_path):
+    optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
+
+    n = len(optimization_vars)
+    x = [False, False, False, True, True]
+    # Generate the ONNX based on X
+    recomputations = []
+    for variable, activations in zip(x, optimization_vars, strict=True):
+        if variable:
+            recomputations.append([activations, optimization_vars[activations]])
+
+    onnx_model = onnx.load(model_path)
+    checkpointed_model = apply_activation_checkpointing(onnx_model, recomputations, forward_outputs, forward_inputs)
+    onnx.save(checkpointed_model, f"{output_path}checkpointed.onnx")
+
+    return 0
 
 
 if __name__ == "__main__":

@@ -56,21 +56,26 @@ def make_initializer(name, data, dtype):
 
 
 def split_forward_backward(onnx_model):
-    forward_inputs = []
-    backward_inputs = []
+    # Output Format is dictlist[tensor.name, list[nodes with tensor as input]]
+    forward_inputs = {}
+    backward_inputs = {}
     for input_tensor in onnx_model.graph.input:
         if "grad" in input_tensor.name:
-            backward_inputs.append([input_tensor.name, None])
+            backward_inputs[input_tensor.name] = [None]
+            # backward_inputs.append([input_tensor.name, [None]])
         else:
-            forward_inputs.append([input_tensor.name, None])
+            forward_inputs[input_tensor.name] = [None]
+            # forward_inputs.append([input_tensor.name, [None]])
 
-    forward_outputs = []
-    backward_outputs = []
+    forward_outputs = {}
+    backward_outputs = {}
     for output_tensor in onnx_model.graph.output:
         if "grad" in output_tensor.name:
-            backward_outputs.append([output_tensor.name, None])
+            backward_outputs[input_tensor.name] = [None]
+            # backward_outputs.append([output_tensor.name, [None]])
         else:
-            forward_outputs.append([output_tensor.name, None])
+            forward_outputs[input_tensor.name] = [None]
+            # forward_outputs.append([output_tensor.name, [None]])
 
     # Find the index of the first LossGrad node
     for i, op_node in enumerate(onnx_model.graph.node):
@@ -84,16 +89,28 @@ def split_forward_backward(onnx_model):
                 if j >= sep_index:
                     for output_name in op_node.output:
                         if output_name in op_node2.input:
-                            if output_name not in [name for name, _ in forward_outputs]:
-                                forward_outputs.append([output_name, op_node2])
-                            if output_name not in [name for name, _ in backward_inputs]:
-                                backward_inputs.append([output_name, op_node])
+                            if output_name in forward_outputs.keys():
+                                forward_outputs[output_name].append(op_node2)
+                            else:
+                                forward_outputs[output_name] = [op_node2]
+
+                            if output_name in backward_inputs.keys():
+                                backward_inputs[output_name].append(op_node)
+                            else:
+                                backward_inputs[output_name] = [op_node]
+                            # if output_name not in [name for name, _ in forward_outputs]:
+                            #     forward_outputs.append([output_name, op_node2])
+                            # if output_name not in [name for name, _ in backward_inputs]:
+                            #     backward_inputs.append([output_name, op_node])
 
     for i, op_node in enumerate(onnx_model.graph.node):
         if i >= sep_index:
             for input_tensor in onnx_model.graph.input:
-                if input_tensor.name in op_node.input and input_tensor.name not in backward_inputs:
-                    backward_inputs.append([input_tensor.name, op_node])
+                if input_tensor.name in op_node.input:
+                    if input_tensor.name in backward_inputs.keys():
+                        backward_inputs[input_tensor.name].append(op_node)
+                    else:
+                        backward_inputs[input_tensor.name] = [op_node]
 
     return forward_inputs, backward_inputs, forward_outputs, backward_outputs
 

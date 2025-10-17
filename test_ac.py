@@ -3,17 +3,17 @@ import logging
 from pathlib import Path
 
 import numpy as np
-import onnx
 import onnx.numpy_helper
 import torch
-from onnx import shape_inference
 from onnxruntime.training import artifacts
 from onnxsim import simplify
 from stream.api import optimize_allocation_ga
 from stream.utils import CostModelEvaluationLUT
 from zigzag.parser.onnx.utils import get_attribute_ints_with_name
 
+import onnx
 from model.resnet18 import ResNet18
+from onnx import shape_inference
 
 # from stream.visualization.memory_usage import plot_memory_usage
 # from stream.visualization.perfetto import convert_scme_to_perfetto_json
@@ -103,22 +103,31 @@ def get_compute_cost(onnx_model, subgraph_node_names):
     return compute_cost
 
 
-def copy_nodes_in_onnx_model(onnx_model, subgraph_node_names, checkpoint_name, insert_before_node_name):
+def get_node_id(onnx_model, node_name):
+    index = None
+    for i, node in enumerate(onnx_model.graph.node):
+        if node.name == node_name:
+            index = i
+            break
+    if index is None:
+        raise ValueError(f"Node '{node_name}' not found in the graph.")
+
+    return index
+
+
+def copy_nodes_in_onnx_model(onnx_model, subgraph_node_names, checkpoint_name, checkpoint_input_nodes_name: str):
     """
     Copies a subgraph, renames its internal edges, and inserts it just before a specific node.
 
     Args:
         subgraph_node_names (list): List of node names that form the subgraph to copy.
     """
-    # Find the target node
-    target_node_idx = None
-    for i, node in enumerate(onnx_model.graph.node):
-        if node.name == insert_before_node_name:
-            target_node_idx = i
-            break
-    if target_node_idx is None:
-        raise ValueError(f"Node '{insert_before_node_name}' not found in the graph.")
-
+    # Find the target nodes
+    target_idx = None
+    target_nodes_idx = []
+    for node in checkpoint_input_nodes_name:
+        target_nodes_idx.append([node, get_node_id(onnx_model, node)])
+    target_idx = min([element[1] for element in target_nodes_idx])
     # Collect the subgraph nodes and their edges
     subgraph_nodes = []
     subgraph_inputs = set()
@@ -178,19 +187,20 @@ def copy_nodes_in_onnx_model(onnx_model, subgraph_node_names, checkpoint_name, i
 
     # Insert the copied subgraph just before the target node
     for node in reversed(copied_nodes):
-        onnx_model.graph.node.insert(target_node_idx, node)
+        onnx_model.graph.node.insert(target_idx, node)
 
-    # Recreate the target node with updated inputs
-    target_node = onnx_model.graph.node[target_node_idx + len(copied_nodes)]
-    new_target_inputs = []
-    for inp in target_node.input:
-        if inp in checkpoint_name:
-            new_target_inputs.append(f"{checkpoint_name}_copy")
-        else:
-            new_target_inputs.append(inp)
+    # Recreate the target nodes with updated inputs
+    for _, target_node_idx in target_nodes_idx:
+        target_node = onnx_model.graph.node[target_node_idx + len(copied_nodes)]
+        new_target_inputs = []
+        for inp in target_node.input:
+            if inp in checkpoint_name:
+                new_target_inputs.append(f"{checkpoint_name}_copy")
+            else:
+                new_target_inputs.append(inp)
 
-    for i, new_input in enumerate(new_target_inputs):
-        target_node.input[i] = new_input
+        for i, new_input in enumerate(new_target_inputs):
+            target_node.input[i] = new_input
 
     return onnx_model
 
@@ -199,8 +209,7 @@ def remove_checkpoint(onnx_model, checkpoint, all_checkpoints, inputs):
     """
     Remove the need to store one checkpoint and replace its need in the backward pass with a recomputation
     """
-
-    checkpoint, output_node = checkpoint
+    checkpoint, nodes = checkpoint
     all_checkpoints = [element[0] for element in all_checkpoints]
     # Store all nodes involved in the recomputation
     computation_nodes = []
@@ -221,7 +230,9 @@ def remove_checkpoint(onnx_model, checkpoint, all_checkpoints, inputs):
 
     # Find the computation nodes required to compute the checkpoint
     search_output_onnx_model(checkpoint)
-    copy_nodes_in_onnx_model(onnx_model, [node.name for node in computation_nodes], checkpoint, output_node.name)
+    copy_nodes_in_onnx_model(
+        onnx_model, [node.name for node in computation_nodes], checkpoint, [node.name for node in nodes]
+    )
     compute_cost = get_compute_cost(onnx_model, [node.name for node in computation_nodes])
     return shape_inference.infer_shapes(onnx_model), compute_cost
 
