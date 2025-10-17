@@ -10,12 +10,8 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Literal
 
-import onnx
 import onnxruntime as ort
 import torch
-from onnx import shape_inference
-from onnxruntime.training import artifacts
-from onnxsim import simplify
 from stream.api import _sanity_check_inputs
 from stream.cost_model.cost_model import StreamCostModelEvaluation
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
@@ -31,9 +27,10 @@ from stream.stages.stage import MainStage
 from zigzag.mapping.temporal_mapping import TemporalMappingType
 from zigzag.utils import pickle_load, pickle_save
 
+import onnx
 from hardware_gen.fusemax_hardware_generator import generate_fusemax_mapping, generate_soc
 from model.mini_llm import MiniTransformerLM
-from tools import apply_onnx_passes, run_stream
+from tools import apply_onnx_passes
 
 _logging.basicConfig(level=_logging.ERROR)
 # Set the logging level to ERROR to suppress warnings
@@ -266,7 +263,7 @@ if __name__ == "__main__":
     # Stream Setup
     mode = "fused"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
-
+    layer_stacks = None
     # Example usage of similar to LLama2
     divisor_factor = 8
     vocab_size = int(32000 / divisor_factor)
