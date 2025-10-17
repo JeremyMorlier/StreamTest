@@ -237,7 +237,6 @@ def evaluate_performance(config):
 
         result["forward"]["energy"] = 0
         result["forward"]["latency"] = 0
-        result["ererfe"]["efeez"] = 0
 
     with open(f"{folder}/resultt.txt", "a") as f:
         json.dump(result, f)
