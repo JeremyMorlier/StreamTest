@@ -329,7 +329,13 @@ if __name__ == "__main__":
     chunksize = math.ceil(num_task / num_workers)
 
     config_generator = ConfigGenerator(
-        num_task, hw_choices, None, None, output_path, inferred_train_onnx_path4, forward_onnx_path
+        num_task,
+        hw_choices,
+        None,
+        None,
+        output_path,
+        forward_onnx_path,
+        inferred_train_onnx_path4,
     )
     id = 0
 

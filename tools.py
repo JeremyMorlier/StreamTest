@@ -184,13 +184,13 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
     forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(onnx_model)
 
     # print(forward_inputs, backward_inputs, forward_outputs, backward_outputs)
-    # onnx.utils.extract_model(
-    #     inferred_train_onnx_path3,
-    #     forward_onnx_path,
-    #     list(forward_inputs.keys()),
-    #     list(forward_outputs.keys()),
-    #     True,
-    # )
+    onnx.utils.extract_model(
+        inferred_train_onnx_path3,
+        forward_onnx_path,
+        list(forward_inputs.keys()),
+        list(forward_outputs.keys()),
+        True,
+    )
     # if check:
     #     print(onnx.checker.check_model(forward_onnx_path))
     # onnx.utils.extract_model(
