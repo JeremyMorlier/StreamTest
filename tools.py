@@ -184,24 +184,24 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
     forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(onnx_model)
 
     # print(forward_inputs, backward_inputs, forward_outputs, backward_outputs)
-    onnx.utils.extract_model(
-        inferred_train_onnx_path3,
-        forward_onnx_path,
-        list(set([obj[0] for obj in forward_inputs])),
-        list(set([obj[0] for obj in forward_outputs])),
-        True,
-    )
-    if check:
-        print(onnx.checker.check_model(forward_onnx_path))
-    onnx.utils.extract_model(
-        inferred_train_onnx_path3,
-        backward_onnx_path,
-        list(set([obj[0] for obj in backward_inputs])),
-        list(set([obj[0] for obj in backward_outputs])),
-        True,
-    )
-    if check:
-        print(onnx.checker.check_model(backward_onnx_path))
+    # onnx.utils.extract_model(
+    #     inferred_train_onnx_path3,
+    #     forward_onnx_path,
+    #     list(forward_inputs.keys()),
+    #     list(forward_outputs.keys()),
+    #     True,
+    # )
+    # if check:
+    #     print(onnx.checker.check_model(forward_onnx_path))
+    # onnx.utils.extract_model(
+    #     inferred_train_onnx_path3,
+    #     backward_onnx_path,
+    #     list(backward_inputs.keys()),
+    #     list(backward_outputs.keys()),
+    #     True,
+    # )
+    # if check:
+    #     print(onnx.checker.check_model(backward_onnx_path))
     # onnx.utils.extract_model(
     #     inferred_train_onnx_path4, optimizer_onnx_path, list(set(optimizer_inputs)), list(set(optimizer_outputs)), True
     # )

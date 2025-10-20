@@ -1,5 +1,6 @@
-import yaml
 import os
+
+import yaml
 
 
 # Structure du YAML
@@ -289,6 +290,7 @@ def generate_soc(
     offchip_filename = os.path.join(path, "offchip.yaml")
     soc_filename = os.path.join(path, "soc.yaml")
 
+    # return None, soc_filename
     # Generate the individual component
     to_yaml(generate_core(xpes, ypes), core_filename)
     to_yaml(generate_simd(vector_pes), simd_filename)
@@ -316,14 +318,15 @@ def generate_soc(
     return yaml_data, soc_filename
 
 
-def generate_fusemax_mapping(path: str):
+def generate_fusemax_mapping(path: str, npes: int = 256):
     mapping_filename = os.path.join(path, "mapping.yaml")
+    # return None, mapping_filename
     yaml_data = [
         {
             "name": "default",
             "core_allocation": [0],
-            "intra_core_tiling": ["D, all"],
-            "inter_core_tiling": ["K, 4"],
+            "intra_core_tiling": ["H, all"],
+            "inter_core_tiling": [f"D, {npes}"],
         },
         {
             "name": "Conv",
@@ -334,14 +337,14 @@ def generate_fusemax_mapping(path: str):
         {
             "name": "Gemm",
             "core_allocation": [0],
-            "intra_core_tiling": ["D, all"],
-            "inter_core_tiling": ["K, 4"],
+            "intra_core_tiling": ["H, all"],
+            "inter_core_tiling": [f"D, {npes}"],
         },
         {
             "name": "Matmul",
             "core_allocation": [0],
-            "intra_core_tiling": ["D, all"],
-            "inter_core_tiling": ["K, 4"],
+            "intra_core_tiling": ["H, all"],
+            "inter_core_tiling": [f"D, {npes}"],
         },
         {"name": "Add", "core_allocation": [1], "intra_core_tiling": ["H, all"], "inter_core_tiling": ["B, 1"]},
         {"name": "Mul", "core_allocation": [1], "intra_core_tiling": ["H, all"], "inter_core_tiling": ["B, 1"]},

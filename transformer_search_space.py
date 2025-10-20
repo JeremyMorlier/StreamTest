@@ -14,6 +14,7 @@ import onnxruntime as ort
 import torch
 from stream.api import _sanity_check_inputs
 from stream.cost_model.cost_model import StreamCostModelEvaluation
+from stream.stages.allocation.constraint_optimization_allocation import ConstraintOptimizationAllocationStage
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
 from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
 from stream.stages.generation.layer_stacks_generation import LayerStacksGenerationStage
@@ -77,6 +78,9 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
     tiled_workload_path = f"{output_path}/tiled_workload.pickle"
     cost_lut_path = f"{output_path}/cost_lut.pickle"
     scme_path = f"{output_path}/scme.pickle"
+    allocations_path = f"{output_path}/waco/"
+    cost_lut_post_co_path = f"{output_path}/cost_lut_post_co.pickle"
+    tiled_workload_post_co_path = f"{output_path}/tiled_workload_post_co.pickle"
 
     # Get logger
     logger = _logging.getLogger(__name__)
@@ -116,6 +120,9 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
             layer_stacks=layer_stacks,
             tiled_workload_path=tiled_workload_path,
             cost_lut_path=cost_lut_path,
+            allocations_path=allocations_path,
+            tiled_workload_post_co_path=tiled_workload_post_co_path,
+            cost_lut_post_co_path=cost_lut_post_co_path,
             temporal_mapping_type=temporal_mapping_type,  # required by ZigZagCoreMappingEstimationStage
             operands_to_prefetch=[],  # required by GeneticAlgorithmAllocationStage
         )
@@ -187,7 +194,7 @@ def evaluate_performance(config):
     )
 
     # Generate Hardware and Mapping Config
-    _, mapping_path = generate_fusemax_mapping(folder)
+    _, mapping_path = generate_fusemax_mapping(folder, hardware_config["XPEs"])
     # Copy Necessary Files
     shutil.copyfile(forward_backward_path, f"{folder}/training.onnx")
     shutil.copyfile(forward_path, f"{folder}/forward.onnx")
@@ -197,21 +204,21 @@ def evaluate_performance(config):
     result["forwardbackward"] = {}
     result["forward"] = {}
     # Evaluate Using Stream
-    try:
-        scme = optimize_allocation_ga_no_id(
-            hardware=soc_yaml_path,
-            workload=f"{folder}/training.onnx",
-            mapping=mapping_path,
-            mode=mode,
-            layer_stacks=layer_stacks,
-            nb_ga_generations=4,
-            nb_ga_individuals=4,
-            output_path=f"{folder}/training",
-            skip_if_exists=False,
-        )
-        result["forwardbackward"]["energy"] = scme.energy
-        result["forwardbackward"]["latency"] = scme.latency
 
+    scme = optimize_allocation_ga_no_id(
+        hardware=soc_yaml_path,
+        workload=f"{folder}/training.onnx",
+        mapping=mapping_path,
+        mode=mode,
+        layer_stacks=layer_stacks,
+        nb_ga_generations=4,
+        nb_ga_individuals=4,
+        output_path=f"{folder}/training",
+        skip_if_exists=False,
+    )
+    result["forwardbackward"]["energy"] = scme.energy
+    result["forwardbackward"]["latency"] = scme.latency
+    try:
         scme = optimize_allocation_ga_no_id(
             hardware=soc_yaml_path,
             workload=f"{folder}/forward.onnx",
@@ -261,7 +268,7 @@ if __name__ == "__main__":
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
     # Stream Setup
-    mode = "fused"
+    mode = "lbl"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
     layer_stacks = None
     # Example usage of similar to LLama2
@@ -327,6 +334,8 @@ if __name__ == "__main__":
     id = 0
 
     config_iterator = iter(config_generator)
+    # for config in config_iterator:
+    #     evaluate_performance(config)
     with Pool(processes=num_workers) as pool:
         r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
         print(r)
