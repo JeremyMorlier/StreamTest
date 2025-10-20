@@ -268,7 +268,7 @@ if __name__ == "__main__":
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
     # Stream Setup
-    mode = "lbl"
+    mode = "fused"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
     layer_stacks = None
     # Example usage of similar to LLama2
