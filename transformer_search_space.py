@@ -66,18 +66,19 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
     nb_ga_generations: int,
     nb_ga_individuals: int,
     output_path: str,
+    id: str,
     skip_if_exists: bool = False,
     temporal_mapping_type: str = "uneven",
 ) -> StreamCostModelEvaluation:
     _sanity_check_inputs(hardware, workload, mapping, mode, output_path)
 
     # Create experiment_id path
-    os.makedirs(f"{output_path}", exist_ok=True)
+    os.makedirs(f"{output_path}{id}", exist_ok=True)
 
     # Output paths
     tiled_workload_path = f"{output_path}/tiled_workload.pickle"
     cost_lut_path = f"{output_path}/cost_lut.pickle"
-    scme_path = f"{output_path}/scme.pickle"
+    scme_path = f"{output_path}{id}/scme.pickle"
     allocations_path = f"{output_path}/waco/"
     cost_lut_post_co_path = f"{output_path}/cost_lut_post_co.pickle"
     tiled_workload_post_co_path = f"{output_path}/tiled_workload_post_co.pickle"
@@ -176,7 +177,8 @@ def evaluate_performance(config):
     mode = config["mode"]
     id_process = multiprocessing.current_process().name
     id_process = id_process.split("-")[-1]
-    folder = config["path"] + id_process + "/" + config["id"]
+    stream_work_folder = config["path"] + id_process + "/"
+    folder = stream_work_folder + config["id"]
     Path(folder).mkdir(parents=True, exist_ok=True)
 
     forward_backward_path = config["training"]
@@ -213,7 +215,8 @@ def evaluate_performance(config):
         layer_stacks=layer_stacks,
         nb_ga_generations=4,
         nb_ga_individuals=4,
-        output_path=f"{folder}/training",
+        output_path=f"{stream_work_folder}/training",
+        id=config["id"],
         skip_if_exists=False,
     )
     result["forwardbackward"]["energy"] = scme.energy
@@ -227,7 +230,8 @@ def evaluate_performance(config):
             layer_stacks=layer_stacks,
             nb_ga_generations=4,
             nb_ga_individuals=4,
-            output_path=f"{folder}/forward",
+            output_path=f"{stream_work_folder}/forward",
+            id=config["id"],
             skip_if_exists=False,
         )
         result["forward"]["energy"] = scme.energy
@@ -254,13 +258,13 @@ if __name__ == "__main__":
 
     logger = _logging.getLogger(__name__)
 
-    _logging.disable(_logging.CRITICAL)
-    stream_handler = _logging.StreamHandler()
-    stream_handler.setLevel(_logging.CRITICAL)
-    logger.addHandler(stream_handler)
-    error_handler = _logging.FileHandler("error.log")
-    error_handler.setLevel(_logging.ERROR)
-    logger.addHandler(error_handler)
+    # _logging.disable(_logging.CRITICAL)
+    # stream_handler = _logging.StreamHandler()
+    # stream_handler.setLevel(_logging.CRITICAL)
+    # logger.addHandler(stream_handler)
+    # error_handler = _logging.FileHandler("error.log")
+    # error_handler.setLevel(_logging.ERROR)
+    # logger.addHandler(error_handler)
 
     onnx_path = os.path.join(folder, "test.onnx")
     infered_path = os.path.join(folder, "inferred.onnx")
