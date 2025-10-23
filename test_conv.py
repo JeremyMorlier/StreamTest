@@ -1,8 +1,6 @@
 import logging
 
-import onnx
 import torch
-from onnx import shape_inference
 from onnxruntime.training import artifacts
 from onnxsim import simplify
 from stream.api import optimize_allocation_ga
@@ -10,22 +8,15 @@ from stream.utils import CostModelEvaluationLUT
 from stream.visualization.memory_usage import plot_memory_usage
 from stream.visualization.perfetto import convert_scme_to_perfetto_json
 
+import onnx
 from model.resnet18 import ResNet18
-from tools import apply_onnx_passes, run_stream
-
-# from stream.visualization.schedule import visualize_timeline_plotly
-from process_onnx import (
-    add_optimizer,
-    process_1d_nodes,
-    process_convolution_grad,
-    process_poolgrad,
-    split_forward_backward,
-)
+from onnx import shape_inference
+from tools import apply_onnx_passes, run_stream, run_stream_co
 
 # Set the logging level to ERROR to suppress warnings
 # ort.set_default_logger_severity(4)
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO)
 
 
 # def run_stream(model_path, accelerator_path, mapping_path, id, output_path):
@@ -71,11 +62,11 @@ logging.basicConfig(level=logging.INFO)
 
 
 if __name__ == "__main__":
-    folder = "results/resnet18_forward/"
+    folder = "results/resnet18_t/"
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
     soc_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_ga.yaml"
+    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused.yaml"
 
     # Generate, Export and Infer Shapes of a ResNet18 Model
     model = ResNet18()
@@ -92,8 +83,44 @@ if __name__ == "__main__":
         requires_grad.append(init.name)
     loss = artifacts.LossType(2)
 
+    def gen_layer_stack(a, b, c, d):
+        if c == 0 and d == 0:
+            return tuple(range(a, b + 1))
+        return tuple(range(a, b + 1)) + tuple(range(c, d + 1))
+
+    layer_stacks = [
+        # gen_layer_stack(297, 314, 0, 0),
+        gen_layer_stack(281, 289, 330, 344),
+        gen_layer_stack(268, 276, 345, 359),
+        gen_layer_stack(254, 262, 360, 374),
+        gen_layer_stack(241, 249, 375, 389),
+        gen_layer_stack(219, 227, 390, 404),
+        gen_layer_stack(206, 214, 405, 419),
+        gen_layer_stack(231, 237, 420, 434),
+        gen_layer_stack(192, 200, 435, 449),
+        gen_layer_stack(179, 187, 450, 464),
+        gen_layer_stack(144, 152, 480, 494),
+        gen_layer_stack(169, 175, 495, 509),
+        gen_layer_stack(130, 138, 510, 524),
+        gen_layer_stack(117, 125, 525, 539),
+        gen_layer_stack(95, 103, 540, 554),
+        gen_layer_stack(82, 90, 555, 569),
+        gen_layer_stack(107, 113, 570, 584),
+        gen_layer_stack(68, 76, 585, 599),
+        gen_layer_stack(55, 63, 600, 614),
+    ]
+    layer_stacks = None
+
     inferred_train_onnx_path4, _, _, _ = apply_onnx_passes(base_model, None, folder, requires_grad, "onnx", check=False)
-    run_stream(infered_path, soc_path, mapping_path, id=2, output_path=folder, mode="fused")
+    run_stream_co(
+        inferred_train_onnx_path4,
+        soc_path,
+        mapping_path,
+        id=17,
+        output_path=folder,
+        mode="fused",
+        layer_stacks=layer_stacks,
+    )
 
     # # Now, we can invoke generate_artifacts with this custom loss function
     # artifacts.generate_artifacts(

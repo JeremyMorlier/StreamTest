@@ -1,15 +1,15 @@
 import os
 from pathlib import Path
 
-import onnx
 import torch
-from onnx import shape_inference
 from onnxruntime.training import artifacts
 from onnxsim import simplify
-from stream.api import optimize_allocation_ga
+from stream.api import optimize_allocation_co, optimize_allocation_ga
 from stream.utils import CostModelEvaluationLUT
 from stream.visualization.perfetto import convert_scme_to_perfetto_json
 
+import onnx
+from onnx import shape_inference
 from process_onnx import (
     add_optimizer,
     expand_softmax_grad_node,
@@ -46,6 +46,58 @@ def get_max_offchip_memory(scme):
             return max(stored_bytes)
     # If not found, return None or raise
     return None
+
+
+def run_stream_co(
+    model_path,
+    accelerator_path,
+    mapping_path,
+    id,
+    output_path,
+    mode="fused",
+    layer_stacks=None,
+):
+    Path(output_path, str(id)).mkdir(parents=True, exist_ok=True)
+
+    # if layer_stacks is None:
+    #     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
+    # Evaluate Using Stream
+    # try :
+    scme = optimize_allocation_co(
+        hardware=accelerator_path,
+        workload=model_path,
+        mapping=mapping_path,
+        mode=mode,
+        layer_stacks=layer_stacks,
+        experiment_id=id,
+        output_path=output_path,
+        skip_if_exists=False,
+    )
+    # except Exception as e:
+    #     logging.error(f"Error during optimization: {e}")
+
+    # Load in the CostModelEvaluationLUT from the run
+    cost_lut_path = os.path.join(output_path, "/{id}/cost_lut.pickle")
+    cost_lut = CostModelEvaluationLUT(cost_lut_path)
+    print(scme.latency, type(scme.latency))
+    with open(f"{output_path}/resultt.txt", "a") as f:
+        f.write(f"{scme.energy}    {scme.latency} \n")
+    # Plotting schedule timeline of best SCME
+    # scme.plot_schedule(
+    #     plot_full_schedule=True,
+    #     draw_dependencies=True,
+    #     plot_data_transfer=True,
+    #     fig_path=f"{output_path}/{id}/schedule.html",
+    # )
+
+    # Plotting memory usage of best SCME
+    scme.plot_memory_usage((0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
+
+    # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
+    convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
+
+    memory = get_max_offchip_memory(scme)
+    return scme.latency, scme.energy, memory
 
 
 def run_stream(
