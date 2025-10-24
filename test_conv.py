@@ -110,13 +110,15 @@ if __name__ == "__main__":
         gen_layer_stack(55, 63, 600, 614),
     ]
     layer_stacks = None
-
-    inferred_train_onnx_path4, _, _, _ = apply_onnx_passes(base_model, None, folder, requires_grad, "onnx", check=False)
+    # layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
+    inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
+        base_model, None, folder, requires_grad, "onnx", check=False
+    )
     run_stream_co(
         inferred_train_onnx_path4,
         soc_path,
         mapping_path,
-        id=17,
+        id=21,
         output_path=folder,
         mode="fused",
         layer_stacks=layer_stacks,

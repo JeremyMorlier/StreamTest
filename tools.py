@@ -77,7 +77,8 @@ def run_stream_co(
     #     logging.error(f"Error during optimization: {e}")
 
     # Load in the CostModelEvaluationLUT from the run
-    cost_lut_path = os.path.join(output_path, "/{id}/cost_lut.pickle")
+    cost_lut_path = os.path.join(output_path, f"/{id}/cost_lut.pickle")
+    print(os.path.exists(cost_lut_path))
     cost_lut = CostModelEvaluationLUT(cost_lut_path)
     print(scme.latency, type(scme.latency))
     with open(f"{output_path}/resultt.txt", "a") as f:
@@ -110,7 +111,8 @@ def run_stream(
     layer_stacks=None,
 ):
     Path(output_path, str(id)).mkdir(parents=True, exist_ok=True)
-
+    cost_lut_path = os.path.join(output_path, f"{id}/cost_lut.pickle")
+    print(output_path, cost_lut_path)
     # if layer_stacks is None:
     #     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
     # Evaluate Using Stream
@@ -131,8 +133,11 @@ def run_stream(
     #     logging.error(f"Error during optimization: {e}")
 
     # Load in the CostModelEvaluationLUT from the run
-    cost_lut_path = os.path.join(output_path, "/{id}/cost_lut.pickle")
+
     cost_lut = CostModelEvaluationLUT(cost_lut_path)
+    print(cost_lut)
+    print(cost_lut.__dict__)
+    print(cost_lut_path, os.path.exists(cost_lut_path))
     print(scme.latency, type(scme.latency))
     with open(f"{output_path}/resultt.txt", "a") as f:
         f.write(f"{scme.energy}    {scme.latency} \n")
