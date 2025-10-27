@@ -92,10 +92,10 @@ def run_stream_co(
     # )
 
     # Plotting memory usage of best SCME
-    scme.plot_memory_usage((0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
+    # scme.plot_memory_usage((0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
 
-    # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
-    convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
+    # # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
+    # convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
 
     memory = get_max_offchip_memory(scme)
     return scme.latency, scme.energy, memory

@@ -515,7 +515,7 @@ def add_optimizer2(
     for input_name in gradient_weights:
         # Create a Sum node to add the gradient accumulation buffer and the gradient
         sum_node = make_node(
-            "Sum",
+            "Add",
             [input_name, input_name + "_grad.accumulation.buffer"],
             [input_name + "_summed_grad"],
             name=f"Sum_Grad_{input_name}",
@@ -746,7 +746,7 @@ def add_optimizer(
         # Create the optimizer nodes (only SGD and Adam are supported for now)
 
         sum_node = make_node(
-            "Sum",
+            "Add",
             [weight_gradient, gradient_buffer_name],
             [weight_name + "_summed_grad"],
             name=f"Sum_Grad_{weight_name}",

@@ -66,9 +66,11 @@ if __name__ == "__main__":
     onnx_path = f"{folder}/test.onnx"
     infered_path = f"{folder}/inferred.onnx"
     soc_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused.yaml"
+    mapping_path = "stream/stream/inputs/examples/mapping/tpu_lke_quad_core_fused_co.yaml"
 
     # Generate, Export and Infer Shapes of a ResNet18 Model
+    from model.miniCNN import MiniCNN
+
     model = ResNet18()
     torch_input = torch.randn(4, 3, 32, 32)
     torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
@@ -80,6 +82,8 @@ if __name__ == "__main__":
     requires_grad = []
     for init in inits:
         # if len(init.dims) != 1 :
+        # print(init.name)
+        # if "conv" in init.name:
         requires_grad.append(init.name)
     loss = artifacts.LossType(2)
 
@@ -114,11 +118,44 @@ if __name__ == "__main__":
     inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
         base_model, None, folder, requires_grad, "onnx", check=False
     )
+    #  (9,), (10, 11, 12), (13, 20, 21, 22, 23), (14, 15, 16, 17, 18, 19)
+    layer_stacks = [(0, 1, 3, 4, 6, 7)]
+    layer_stacks = [
+        (0, 1, 3, 4),
+        (6,),
+        (7,),
+        (9,),
+        (10, 11, 12),
+        (14,),
+        (15,),
+        (16,),
+        (17,),
+        (18,),
+        (19,),
+        (13, 20, 21, 22, 23),
+    ]
+    layer_stacks = [(0, 1, 3, 4), (6,), (7,), (9,), (10, 11, 12), (14, 15, 16, 17, 18, 19), (13, 20, 21, 22, 23)]
+    layer_stacks = [
+        (0, 1),
+        (2,),
+        (4,),
+        (11, 12, 34),
+        (5,),
+        (35, 36, 37),
+        (39, 40, 41, 42, 43, 44),
+        (14, 16, 17),
+        (38, 45, 46, 47, 48),
+        (19,),
+        (20, 21, 22),
+        (24, 25, 26, 27, 28, 29),
+        (23, 30, 31, 32, 33),
+    ]
+    layer_stacks = None
     run_stream_co(
         inferred_train_onnx_path4,
         soc_path,
         mapping_path,
-        id=21,
+        id=33,
         output_path=folder,
         mode="fused",
         layer_stacks=layer_stacks,
