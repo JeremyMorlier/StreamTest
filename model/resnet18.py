@@ -92,6 +92,7 @@ class ResNet(nn.Module):
         out = self.layer1(out)
         # return out
         out = self.layer2(out)
+        return out
         out = self.layer3(out)
         # return out
         out = self.layer4(out)

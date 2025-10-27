@@ -82,10 +82,12 @@ if __name__ == "__main__":
     requires_grad = []
     for init in inits:
         # if len(init.dims) != 1 :
-        # print(init.name)
-        # if "conv" in init.name:
-        requires_grad.append(init.name)
+        print(init.name)
+        if "conv1" in init.name:
+            requires_grad.append(init.name)
+        # requires_grad.append(init.name)
     loss = artifacts.LossType(2)
+    print(requires_grad)
 
     def gen_layer_stack(a, b, c, d):
         if c == 0 and d == 0:
@@ -118,23 +120,7 @@ if __name__ == "__main__":
     inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
         base_model, None, folder, requires_grad, "onnx", check=False
     )
-    #  (9,), (10, 11, 12), (13, 20, 21, 22, 23), (14, 15, 16, 17, 18, 19)
-    layer_stacks = [(0, 1, 3, 4, 6, 7)]
-    layer_stacks = [
-        (0, 1, 3, 4),
-        (6,),
-        (7,),
-        (9,),
-        (10, 11, 12),
-        (14,),
-        (15,),
-        (16,),
-        (17,),
-        (18,),
-        (19,),
-        (13, 20, 21, 22, 23),
-    ]
-    layer_stacks = [(0, 1, 3, 4), (6,), (7,), (9,), (10, 11, 12), (14, 15, 16, 17, 18, 19), (13, 20, 21, 22, 23)]
+
     layer_stacks = [
         (0, 1),
         (2,),
@@ -142,20 +128,22 @@ if __name__ == "__main__":
         (11, 12, 34),
         (5,),
         (35, 36, 37),
-        (39, 40, 41, 42, 43, 44),
+        (39, 40, 41, 42, 43),
         (14, 16, 17),
-        (38, 45, 46, 47, 48),
+        (38, 44, 45, 46, 47),
         (19,),
+        (48,),
         (20, 21, 22),
-        (24, 25, 26, 27, 28, 29),
-        (23, 30, 31, 32, 33),
+        (24, 25, 26, 27, 28),
+        (23, 29, 30, 31, 32),
+        (33,),
     ]
     layer_stacks = None
     run_stream_co(
         inferred_train_onnx_path4,
         soc_path,
         mapping_path,
-        id=33,
+        id=50,
         output_path=folder,
         mode="fused",
         layer_stacks=layer_stacks,
