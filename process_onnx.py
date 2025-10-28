@@ -940,6 +940,33 @@ def process_concat_nodes(onnx_model):
                 n_inputs = len(node.input)
     return onnx_model
 
+def process_sum_nodes(onnx_model):
+    """
+    Check the ONNX Model for Sum nodes that have more than two inputs and split them as it is not supported in Stream
+    """
+
+    for i, node in enumerate(onnx_model.graph.node):
+        if node.op_type in "Sum":
+            n_inputs = len(node.input)
+            k = 0
+
+            attrs = node.attribute
+            # Sum the two inputs with a new Sum node until only two inputs left
+            while n_inputs > 2:
+                concat_node = make_node(
+                    "Sum",
+                    [node.input[k], node.input[k + 1]],
+                    [f"{node.name}_intermediary_sum_{k}"],
+                    name=f"{node.name}_intermediary_sum_{k}",
+                )
+                onnx_model.graph.node.insert(i, concat_node)
+                node.input[0] = f"{node.name}_intermediary_sum_{k}"
+                for l in range(1, len(node.input) - 1):
+                    node.input[l] = node.input[l + 1]
+                del node.input[-1]
+                k += 1
+                n_inputs = len(node.input)
+    return onnx_model
 
 def expand_softmax_grad_node(onnx_model):
     """

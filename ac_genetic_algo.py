@@ -5,7 +5,6 @@ from os import getpid
 from pathlib import Path
 import csv
 import onnx
-import random
 import torch
 from onnx import shape_inference
 from onnxruntime.training import artifacts
@@ -17,19 +16,45 @@ from pymoo.operators.sampling.rnd import BinaryRandomSampling
 from pymoo.optimize import minimize
 from pymoo.visualization.scatter import Scatter
 
+from tools import get_max_offchip_memory
+import os
+from stream.api import _sanity_check_inputs
+from stream.cost_model.cost_model import StreamCostModelEvaluation
+from stream.stages.allocation.constraint_optimization_allocation import ConstraintOptimizationAllocationStage
+from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
+from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
+from stream.stages.generation.layer_stacks_generation import LayerStacksGenerationStage
+from stream.stages.generation.scheduling_order_generation import SchedulingOrderGenerationStage
+from stream.stages.generation.tiled_workload_generation import TiledWorkloadGenerationStage
+from stream.stages.generation.tiling_generation import TilingGenerationStage
+from stream.stages.parsing.accelerator_parser import AcceleratorParserStage
+from stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as StreamONNXModelParserStage
+from stream.stages.set_fixed_allocation_performance import SetFixedAllocationPerformanceStage
+from stream.stages.stage import MainStage
+from zigzag.mapping.temporal_mapping import TemporalMappingType
+from zigzag.utils import pickle_load, pickle_save
+
+from typing import Literal
+
 from model.resnet18 import ResNet18
 from process_onnx import (
     split_forward_backward,
 )
 from test_ac import apply_onnx_pass, remove_checkpoint
 from tools import run_stream
-
+import onnxruntime as ort
+ort.set_default_logger_severity(4)
 
 # TODO: check if the forward outputs and inputs do not need to be recomputed at each pass
 def apply_activation_checkpointing(model, recomputations, forward_outputs, forward_inputs):
     for recomputation in recomputations:
         model, compute_cost = remove_checkpoint(model, recomputation, forward_outputs, forward_inputs)
         forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(model)
+        # print(type(forward_outputs))
+        # for key, value in forward_outputs.items() :
+        #     if value[0] != None:
+        #         # print(key, value)
+                # print(key, [node.name for node in value])
     return model
 
 
@@ -87,8 +112,8 @@ class ActivationCheckpointingProblem(Problem):
         )
 
         # Evaluate with Stream
-        latency, energy, memory = run_stream(
-            processed_model_path, self.accelerator_path, self.mapping_path, x, f"{folder}"
+        latency, energy, memory = optimize_allocation_ga_no_id(
+            self.accelerator_path, processed_model_path, self.mapping_path, mode="fused", layer_stacks=None, nb_ga_generations=4, nb_ga_individuals=4, output_path=f"{folder}", id=x
         )
         return latency, energy, memory
 
@@ -99,6 +124,74 @@ class ActivationCheckpointingProblem(Problem):
         out["F"] = r
         # the objectives are the energy, latency and memory
 
+def optimize_allocation_ga_no_id(  # noqa: PLR0913
+    hardware: str,
+    workload: str,
+    mapping: str,
+    mode: Literal["lbl"] | Literal["fused"],
+    layer_stacks: list[tuple[int, ...]],
+    nb_ga_generations: int,
+    nb_ga_individuals: int,
+    output_path: str,
+    id: str,
+    temporal_mapping_type: str = "uneven",
+) -> StreamCostModelEvaluation:
+    _sanity_check_inputs(hardware, workload, mapping, mode, output_path)
+
+    # Create experiment_id path
+    os.makedirs(f"{output_path}{id}", exist_ok=True)
+
+    # Output paths
+    tiled_workload_path = f"{output_path}/tiled_workload.pickle"
+    cost_lut_path = f"{output_path}/cost_lut.pickle"
+    scme_path = f"{output_path}{id}/scme.pickle"
+    allocations_path = f"{output_path}/waco/"
+    cost_lut_post_co_path = f"{output_path}/cost_lut_post_co.pickle"
+    tiled_workload_post_co_path = f"{output_path}/tiled_workload_post_co.pickle"
+
+    # Determine temporal mapping type for ZigZag
+    if temporal_mapping_type == "uneven":
+        temporal_mapping_type = TemporalMappingType.UNEVEN
+    elif temporal_mapping_type == "even":
+        temporal_mapping_type = TemporalMappingType.EVEN
+    else:
+        raise ValueError(f"Invalid temporal mapping type: {temporal_mapping_type}. Must be 'uneven' or 'even'.")
+
+
+    mainstage = MainStage(
+        [  # Initializes the MainStage as entry point
+            AcceleratorParserStage,  # Parses the accelerator
+            StreamONNXModelParserStage,  # Parses the ONNX Model into the workload
+            LayerStacksGenerationStage,
+            TilingGenerationStage,
+            TiledWorkloadGenerationStage,
+            ZigZagCoreMappingEstimationStage,
+            SetFixedAllocationPerformanceStage,
+            SchedulingOrderGenerationStage,
+            GeneticAlgorithmAllocationStage,
+        ],
+        accelerator=hardware,  # required by AcceleratorParserStage
+        workload_path=workload,  # required by ModelParserStage
+        mapping_path=mapping,  # required by ModelParserStage
+        loma_lpf_limit=6,  # required by LomaEngine
+        nb_ga_generations=nb_ga_generations,  # number of genetic algorithm (ga) generations
+        nb_ga_individuals=nb_ga_individuals,  # number of individuals in each ga generation
+        mode=mode,
+        layer_stacks=layer_stacks,
+        tiled_workload_path=tiled_workload_path,
+        cost_lut_path=cost_lut_path,
+        allocations_path=allocations_path,
+        tiled_workload_post_co_path=tiled_workload_post_co_path,
+        cost_lut_post_co_path=cost_lut_post_co_path,
+        temporal_mapping_type=temporal_mapping_type,  # required by ZigZagCoreMappingEstimationStage
+        operands_to_prefetch=[],  # required by GeneticAlgorithmAllocationStage
+    )
+    # Launch the MainStage
+    answers = mainstage.run()
+    scme = answers[0][0]
+    pickle_save(scme, scme_path)  # type: ignore
+    memory = get_max_offchip_memory(scme)
+    return scme.latency, scme.energy, memory
 
 def generate_model(output_path):
     model_path = f"{output_path}model.onnx"
@@ -142,80 +235,97 @@ def generate_model(output_path):
 
 def test(output_path):
     optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
-
+    import random
     n = len(optimization_vars)
-    x = [False, False, False, True, True]
+    x = random.choices([False, True], k=n)
+    print(x)
+    # x =[False, True, True, False, False]
     # Generate the ONNX based on X
     recomputations = []
     for variable, activations in zip(x, optimization_vars, strict=True):
         if variable:
             recomputations.append([activations, optimization_vars[activations]])
-
+    # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
+    recomputations.reverse()
+    # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
     onnx_model = onnx.load(model_path)
     checkpointed_model = apply_activation_checkpointing(onnx_model, recomputations, forward_outputs, forward_inputs)
     onnx.save(checkpointed_model, f"{output_path}checkpointed.onnx")
+    processed_model_path, forward_path, backward_pass, opt_pass = apply_onnx_pass(
+        output_path=f"{output_path}/", model=checkpointed_model
+    )
+    accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
+    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise.yaml"
+    # Evaluate with Stream
+    latency, energy, memory = optimize_allocation_ga_no_id(
+        accelerator_path, processed_model_path, mapping_path, mode="fused", layer_stacks=None, nb_ga_generations=4, nb_ga_individuals=4, output_path=f"{output_path}", id=x
+    )
+    return latency, energy, memory
 
     return 0
 
 
 if __name__ == "__main__":
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_ga.yaml"
+    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise.yaml"
     output_path = "results/ga_ac/"
 
     Path(output_path).mkdir(parents=True, exist_ok=True)
     optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
 
-    # Run the optimization
-    problem = ActivationCheckpointingProblem(
-        optimization_vars,
-        forward_inputs,
-        forward_outputs,
-        model_path,
-        accelerator_path,
-        mapping_path,
-        output_path,
-        processes=32,
-    )
+    test(output_path)
+    # # Run the optimization
+    # problem = ActivationCheckpointingProblem(
+    #     optimization_vars,
+    #     forward_inputs,
+    #     forward_outputs,
+    #     model_path,
+    #     accelerator_path,
+    #     mapping_path,
+    #     output_path,
+    #     processes=32,
+    # )
 
-    algorithm = NSGA2(
-        pop_size=100,
-        sampling=BinaryRandomSampling(),
-        crossover=BinomialCrossover(n_offsprings=2, prob=0.9),
-        mutation=BitflipMutation(prob=0.1),
-        eliminate_duplicates=True,
-    )
+    # algorithm = NSGA2(
+    #     pop_size=100,
+    #     sampling=BinaryRandomSampling(),
+    #     crossover=BinomialCrossover(n_offsprings=2, prob=0.9),
+    #     mutation=BitflipMutation(prob=0.1),
+    #     eliminate_duplicates=True,
+    # )
 
-    res = minimize(
-        problem,
-        algorithm,
-        ("n_gen", 50),  # Number of generations
-        seed=1,
-        verbose=True,
-        save_history=True,
-    )
+    # res = minimize(
+    #     problem,
+    #     algorithm,
+    #     ("n_gen", 50),  # Number of generations
+    #     seed=1,
+    #     verbose=True,
+    #     save_history=True,
+    # )
 
-    best_x = res.X
-    best_f = res.F
-    best_pop_x = res.pop.get("X")
-    best_pop_f = res.pop.get("F")
+    # best_x = res.X
+    # best_f = res.F
+    # best_pop_x = res.pop.get("X")
+    # best_pop_f = res.pop.get("F")
 
-    with open(f"{output_path}result.csv", "w") as file:
-        writer = csv.writer(file)
-        writer.writerow(best_x + best_f)
-        for i, (ind_x, ind_f) in enumerate(zip(best_pop_x, best_pop_f, strict=True)):
-            writer.writerow([i] + ind_x.tolist() + ind_f.tolist())
-    history_list = []
-    for i, run in enumerate(res.history):
-        pop = run.pop
-        for j, individual in enumerate(pop):
-            temp_list = [i, j] + individual._X.tolist() + individual._F.tolist()
-            history_list.append(temp_list)
+    # with open(f"{output_path}result.csv", "w") as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(best_x + best_f)
+    #     for i, (ind_x, ind_f) in enumerate(zip(best_pop_x, best_pop_f, strict=True)):
+    #         writer.writerow([i] + ind_x.tolist() + ind_f.tolist())
+    # history_list = []
+    # for i, run in enumerate(res.history):
+    #     pop = run.pop
+    #     for j, individual in enumerate(pop):
+    #         temp_list = [i, j] + individual._X.tolist() + individual._F.tolist()
+    #         history_list.append(temp_list)
 
-    with open(f"{output_path}history.csv", "w") as file:
-        writer = csv.writer(file)
-        writer.writerow(["Run", "Individual", "X", "F"])
-        for line in history_list:
-            writer.writerow(line)
-    # Plot the Pareto front
-    Scatter().add(res.F).show()
+    # with open(f"{output_path}history.csv", "w") as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(["Run", "Individual", "X", "F"])
+    #     for line in history_list:
+    #         writer.writerow(line)
+    # # Plot the Pareto front
+    # Scatter().add(res.F).show()
+
+

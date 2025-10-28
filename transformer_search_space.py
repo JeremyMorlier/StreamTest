@@ -196,11 +196,13 @@ def evaluate_performance(config):
     )
 
     # Generate Hardware and Mapping Config
-    _, mapping_path = generate_fusemax_mapping(folder, hardware_config["XPEs"])
+    # _, mapping_path = generate_fusemax_mapping(folder, hardware_config["XPEs"])
+    
     # Copy Necessary Files
     shutil.copyfile(forward_backward_path, f"{folder}/training.onnx")
     shutil.copyfile(forward_path, f"{folder}/forward.onnx")
-
+    shutil.copyfile("mapping.yaml", f"{folder}/mapping.yaml")
+    mapping_path = f"{folder}/mapping.yaml"
     result["soc"] = soc
 
     result["forwardbackward"] = {}
@@ -253,6 +255,17 @@ def evaluate_performance(config):
 
 
 if __name__ == "__main__":
+
+    import signal
+    import traceback
+    import sys
+
+    def handle_signal(signum, frame):
+        print("Received signal:", signum)
+        traceback.print_stack(frame)
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, handle_signal)
     args = argparser()
     folder = args.output_path
 
@@ -272,11 +285,11 @@ if __name__ == "__main__":
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
     # Stream Setup
-    mode = "fused"
+    mode = "lbl"
     layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
     layer_stacks = None
     # Example usage of similar to LLama2
-    divisor_factor = 8
+    divisor_factor = 16
     vocab_size = int(32000 / divisor_factor)
     max_seq_len = int(2048 / divisor_factor)
     d_model = int(4096 / divisor_factor)
@@ -305,7 +318,7 @@ if __name__ == "__main__":
         output_names=["output"],
         opset_version=16,
     )
-
+    print("Model exported")
     base_model = onnx.load(onnx_path, load_external_data=False)
 
     inits = base_model.graph.initializer
@@ -344,8 +357,8 @@ if __name__ == "__main__":
     id = 0
 
     config_iterator = iter(config_generator)
-    # for config in config_iterator:
-    #     evaluate_performance(config)
+    for config in config_iterator:
+        evaluate_performance(config)
     with Pool(processes=num_workers) as pool:
         r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
         print(r)

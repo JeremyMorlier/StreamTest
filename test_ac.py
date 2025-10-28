@@ -122,6 +122,7 @@ def copy_nodes_in_onnx_model(onnx_model, subgraph_node_names, checkpoint_name, c
     Args:
         subgraph_node_names (list): List of node names that form the subgraph to copy.
     """
+    print(subgraph_node_names)
     # Find the target nodes
     target_idx = None
     target_nodes_idx = []
@@ -210,7 +211,10 @@ def remove_checkpoint(onnx_model, checkpoint, all_checkpoints, inputs):
     Remove the need to store one checkpoint and replace its need in the backward pass with a recomputation
     """
     checkpoint, nodes = checkpoint
-    all_checkpoints = [element[0] for element in all_checkpoints]
+    # all_checkpoints = [element[0] for element in all_checkpoints]
+    all_checkpoints_keys = list(all_checkpoints.keys())
+    # print(checkpoint, [e.name for e in all_checkpoints[checkpoint]])
+    # print(all_checkpoints)
     # Store all nodes involved in the recomputation
     computation_nodes = []
 
@@ -223,7 +227,8 @@ def remove_checkpoint(onnx_model, checkpoint, all_checkpoints, inputs):
 
     # recursively find all nodes inputs are either in the forward pass (weights, inputs) or in the checkpoints
     def recursive_find_computation_nodes(node_input):
-        if node_input in all_checkpoints or node_input in inputs:
+        # print(node_input, inputs)
+        if node_input in all_checkpoints_keys or node_input in [element[0] for element in inputs]:
             return
         else:
             search_output_onnx_model(node_input)
@@ -233,6 +238,7 @@ def remove_checkpoint(onnx_model, checkpoint, all_checkpoints, inputs):
     copy_nodes_in_onnx_model(
         onnx_model, [node.name for node in computation_nodes], checkpoint, [node.name for node in nodes]
     )
+    # all_checkpoints
     compute_cost = get_compute_cost(onnx_model, [node.name for node in computation_nodes])
     return shape_inference.infer_shapes(onnx_model), compute_cost
 
@@ -275,8 +281,8 @@ def apply_onnx_pass(output_path="./", check=True, model=None):
     if check:
         onnx.checker.check_model(process2)
 
-    model_simplified, check = simplify(process2, skipped_optimizers=["extract_constant_to_initializer"])
-    process3 = process_1d_nodes(model_simplified)
+    # model_simplified, check = simplify(process2, skipped_optimizers=["extract_constant_to_initializer"])
+    process3 = process_1d_nodes(process2)
     process3 = shape_inference.infer_shapes(process3)
     onnx.save(process3, inferred_train_onnx_path3)
     if check:
@@ -303,21 +309,21 @@ def apply_onnx_pass(output_path="./", check=True, model=None):
     onnx.utils.extract_model(
         inferred_train_onnx_path3,
         forward_onnx_path,
-        list(set([obj[0] for obj in forward_inputs])),
-        list(set([obj[0] for obj in forward_outputs])),
+        list(forward_inputs.keys()),
+        list(forward_outputs.keys()),
         True,
     )
     if check:
         onnx.checker.check_model(forward_onnx_path)
-    onnx.utils.extract_model(
-        inferred_train_onnx_path3,
-        backward_onnx_path,
-        list(set([obj[0] for obj in backward_inputs])),
-        list(set([obj[0] for obj in backward_outputs])),
-        True,
-    )
-    if check:
-        onnx.checker.check_model(backward_onnx_path)
+    # onnx.utils.extract_model(
+    #     inferred_train_onnx_path3,
+    #     backward_onnx_path,
+    #     list(backward_inputs.keys()),
+    #     list(backward_outputs.keys()),
+    #     True,
+    # )
+    # if check:
+    #     onnx.checker.check_model(backward_onnx_path)
     # onnx.utils.extract_model(
     #     inferred_train_onnx_path4, optimizer_onnx_path, list(set(optimizer_inputs)), list(set(optimizer_outputs)), True
     # )

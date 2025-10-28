@@ -19,6 +19,7 @@ from process_onnx import (
     process_convolution_grad,
     process_poolgrad,
     split_forward_backward,
+    process_sum_nodes
 )
 
 
@@ -225,6 +226,11 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
 
     # Check for ConCat nodes with more than two inputs and split them
     process3 = process_concat_nodes(process3)
+    process3 = shape_inference.infer_shapes(process3)
+    if check:
+        print(onnx.checker.check_model(process3))
+    # Check for Sum Nodes with more than two inputs and split them
+    process3 = process_sum_nodes(process3)
     process3 = shape_inference.infer_shapes(process3)
     if check:
         print(onnx.checker.check_model(process3))
