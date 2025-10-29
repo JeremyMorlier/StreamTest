@@ -122,7 +122,6 @@ def copy_nodes_in_onnx_model(onnx_model, subgraph_node_names, checkpoint_name, c
     Args:
         subgraph_node_names (list): List of node names that form the subgraph to copy.
     """
-    print(subgraph_node_names)
     # Find the target nodes
     target_idx = None
     target_nodes_idx = []
@@ -372,7 +371,7 @@ def apply_activation_checkpointing(
         checkpointed_model, compute_cost = remove_checkpoint(
             inferred_model, checkpoint, forward_outputs, forward_inputs
         )
-        print(compute_cost)
+        # print(compute_cost)
         onnx.save(checkpointed_model, f"{folder}ac_{i}.onnx")
 
         # inferred_train_onnx_path4, forward_onnx_path, backward_onnx_path, optimizer_onnx_path = apply_onnx_pass(
