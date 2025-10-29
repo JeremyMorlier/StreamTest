@@ -301,7 +301,6 @@ if __name__ == "__main__":
         else:
             torch.nn.init.uniform(param, 3, 4)
 
-    base_model = onnx.load(onnx_path)
     # Export to ONNX
     torch.onnx.export(
         model,
@@ -312,7 +311,7 @@ if __name__ == "__main__":
         opset_version=16,
         external_data=True,
     )
-
+    base_model = onnx.load(onnx_path)
     from tools import apply_onnx_passes
 
     inits = base_model.graph.initializer
