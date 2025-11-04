@@ -279,7 +279,7 @@ def test(output_path):
         output_path=f"{output_path}/", model=checkpointed_model
     )
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise.yaml"
+    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
     # Evaluate with Stream
     latency, energy, memory = optimize_allocation_ga_no_id(
         accelerator_path,
