@@ -19,7 +19,7 @@ from process_onnx import (
     process_convolution_grad,
     process_poolgrad,
     split_forward_backward,
-    process_sum_nodes
+    process_sum_nodes,
 )
 
 
@@ -92,11 +92,17 @@ def run_stream_co(
     #     fig_path=f"{output_path}/{id}/schedule.html",
     # )
 
-    # Plotting memory usage of best SCME
-    # scme.plot_memory_usage((0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
+    try:
+        # Plotting memory usage of best SCME
+        scme.plot_memory_usage((0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
+    except Exception as e:
+        print(e)
 
-    # # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
-    # convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
+    try:
+        # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
+        convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
+    except Exception as e:
+        print(e)
 
     memory = get_max_offchip_memory(scme)
     return scme.latency, scme.energy, memory
@@ -150,12 +156,17 @@ def run_stream(
     #     fig_path=f"{output_path}/{id}/schedule.html",
     # )
 
-    # Plotting memory usage of best SCME
-    scme.plot_memory_usage((0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
+    try:
+        # Plotting memory usage of best SCME
+        scme.plot_memory_usage((0,), (100,), fig_path=f"{output_path}/{id}/memory.png", show_dram=True)
+    except Exception as e:
+        print(e)
 
-    # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
-    convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
-
+    try:
+        # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
+        convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
+    except Exception as e:
+        print(e)
     memory = get_max_offchip_memory(scme)
     return scme.latency, scme.energy, memory
 

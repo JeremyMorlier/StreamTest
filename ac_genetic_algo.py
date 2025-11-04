@@ -48,10 +48,22 @@ ort.set_default_logger_severity(3)
 
 # TODO: check if the forward outputs and inputs do not need to be recomputed at each pass
 def apply_activation_checkpointing(model, recomputations, forward_outputs, forward_inputs):
+    local_forward_inputs, local_forward_outputs = (
+        forward_inputs,
+        forward_outputs,
+    )
+    total_memory_cost = 0
     for recomputation in recomputations:
-        model, compute_cost = remove_checkpoint(model, recomputation, forward_outputs, forward_inputs)
-        forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(model)
-    return model
+        model, compute_cost, memory_cost = remove_checkpoint(
+            model, recomputation, local_forward_outputs, local_forward_inputs
+        )
+        local_forward_inputs, _, local_forward_outputs, _ = split_forward_backward(model)
+        total_memory_cost += memory_cost
+    return model, total_memory_cost
+
+
+def bool_list_to_string(bool_list):
+    return "".join(["1" if b else "0" for b in bool_list])
 
 
 class ActivationCheckpointingProblem(Problem):
@@ -93,7 +105,7 @@ class ActivationCheckpointingProblem(Problem):
         Path(folder).mkdir(parents=True, exist_ok=True)
         shutil.copyfile(model_path, f"{folder}model.onnx")
 
-        latency, energy, memory = 0, 0, 0
+        latency, energy, memory, saved_memory = 0, 0, 0, 0
         try:
             # Generate the ONNX based on X
             recomputations = []
@@ -103,7 +115,7 @@ class ActivationCheckpointingProblem(Problem):
 
             recomputations.reverse()
             onnx_model = onnx.load(f"{folder}model.onnx")
-            checkpointed_model = apply_activation_checkpointing(
+            checkpointed_model, saved_memory = apply_activation_checkpointing(
                 onnx_model, recomputations, self.forward_outputs, self.forward_inputs
             )
             onnx.save(checkpointed_model, f"{folder}checkpointed.onnx")
@@ -121,11 +133,11 @@ class ActivationCheckpointingProblem(Problem):
                 nb_ga_generations=4,
                 nb_ga_individuals=4,
                 output_path=f"{folder}",
-                id=x,
+                id=bool_list_to_string(x),
             )
         except Exception as e:
             logging.error(e)
-        return latency, energy, memory
+        return latency, energy, saved_memory
 
     def _evaluate(self, x, out, *args, **kwargs):
         with Pool(processes=self.processes) as pool:
@@ -153,8 +165,8 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
     os.makedirs(f"{output_path}{id}", exist_ok=True)
 
     # Output paths
-    tiled_workload_path = f"{output_path}/tiled_workload.pickle"
-    cost_lut_path = f"{output_path}/cost_lut.pickle"
+    tiled_workload_path = f"{output_path}{id}/tiled_workload.pickle"
+    cost_lut_path = f"{output_path}{id}/cost_lut.pickle"
     scme_path = f"{output_path}{id}/scme.pickle"
     allocations_path = f"{output_path}/waco/"
     cost_lut_post_co_path = f"{output_path}/cost_lut_post_co.pickle"
@@ -201,11 +213,12 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
     scme = answers[0][0]
     pickle_save(scme, scme_path)  # type: ignore
     memory = get_max_offchip_memory(scme)
+    logging.error(f"{id} {scme.latency} {scme.energy}, {memory}")
     return scme.latency, scme.energy, memory
 
 
 def generate_model(output_path):
-    model_path = f"{output_path}model.onnx"
+    model_path: str = f"{output_path}model.onnx"
     train_onnx_path = f"{output_path}training_model.onnx"
     # Generate, Export and Infer Shapes of a ResNet18 Model
     model = ResNet18()
@@ -214,7 +227,7 @@ def generate_model(output_path):
             torch.nn.init.kaiming_uniform_(param)
         else:
             torch.nn.init.uniform(param, 3, 4)
-    torch_input = torch.randn(4, 3, 32, 32)
+    torch_input = torch.randn(32, 3, 32, 32)
     torch.onnx.export(model, torch_input, model_path, opset_version=13)
     shape_inference.infer_shapes_path(model_path, model_path)
 
@@ -312,11 +325,11 @@ if __name__ == "__main__":
         accelerator_path,
         mapping_path,
         output_path,
-        processes=32,
+        processes=16,
     )
 
     algorithm = NSGA2(
-        pop_size=100,
+        pop_size=20,
         sampling=BinaryRandomSampling(),
         crossover=BinomialCrossover(n_offsprings=2, prob=0.9),
         mutation=BitflipMutation(prob=0.1),
@@ -326,7 +339,7 @@ if __name__ == "__main__":
     res = minimize(
         problem,
         algorithm,
-        ("n_gen", 50),  # Number of generations
+        ("n_gen", 6),  # Number of generations
         seed=1,
         verbose=True,
         save_history=True,
