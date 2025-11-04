@@ -36,6 +36,7 @@ from zigzag.utils import pickle_load, pickle_save
 
 import onnx
 from model.resnet18 import ResNet18
+from model.resnet224 import ResNet18_224
 from onnx import shape_inference
 from process_onnx import (
     split_forward_backward,
@@ -46,7 +47,6 @@ from tools import get_max_offchip_memory, run_stream
 ort.set_default_logger_severity(3)
 
 
-# TODO: check if the forward outputs and inputs do not need to be recomputed at each pass
 def apply_activation_checkpointing(model, recomputations, forward_outputs, forward_inputs):
     local_forward_inputs, local_forward_outputs = (
         forward_inputs,
@@ -137,7 +137,8 @@ class ActivationCheckpointingProblem(Problem):
             )
         except Exception as e:
             logging.error(e)
-        return latency, energy, saved_memory
+        logging.error(f"{id} {latency} {energy}, {saved_memory}")
+        return latency, energy, -saved_memory
 
     def _evaluate(self, x, out, *args, **kwargs):
         with Pool(processes=self.processes) as pool:
@@ -213,7 +214,6 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
     scme = answers[0][0]
     pickle_save(scme, scme_path)  # type: ignore
     memory = get_max_offchip_memory(scme)
-    logging.error(f"{id} {scme.latency} {scme.energy}, {memory}")
     return scme.latency, scme.energy, memory
 
 
@@ -221,13 +221,13 @@ def generate_model(output_path):
     model_path: str = f"{output_path}model.onnx"
     train_onnx_path = f"{output_path}training_model.onnx"
     # Generate, Export and Infer Shapes of a ResNet18 Model
-    model = ResNet18()
+    model = ResNet18_224()
     for param in model.parameters():
         if param.dim() > 1:  # Weights
             torch.nn.init.kaiming_uniform_(param)
         else:
             torch.nn.init.uniform(param, 3, 4)
-    torch_input = torch.randn(32, 3, 32, 32)
+    torch_input = torch.randn(32, 3, 224, 224)
     torch.onnx.export(model, torch_input, model_path, opset_version=13)
     shape_inference.infer_shapes_path(model_path, model_path)
 
