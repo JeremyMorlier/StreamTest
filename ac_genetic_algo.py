@@ -352,7 +352,8 @@ if __name__ == "__main__":
 
     with open(f"{output_path}result.csv", "w") as file:
         writer = csv.writer(file)
-        writer.writerow(best_x + best_f)
+        writer.writerow(best_x)
+        writer.writerow(best_f)
         for i, (ind_x, ind_f) in enumerate(zip(best_pop_x, best_pop_f, strict=True)):
             writer.writerow([i] + ind_x.tolist() + ind_f.tolist())
     history_list = []
