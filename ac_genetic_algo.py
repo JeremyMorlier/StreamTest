@@ -325,7 +325,7 @@ if __name__ == "__main__":
         accelerator_path,
         mapping_path,
         output_path,
-        processes=16,
+        processes=2,
     )
 
     algorithm = NSGA2(
