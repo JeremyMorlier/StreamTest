@@ -29,6 +29,7 @@ from process_onnx import (
     shape2tuple,
     split_forward_backward,
 )
+from math import prod
 
 # Set the logging level to ERROR to suppress warnings
 # ort.set_default_logger_severity(4)
@@ -239,7 +240,9 @@ def remove_checkpoint(onnx_model, checkpoint, all_checkpoints, inputs):
     )
     # all_checkpoints
     compute_cost = get_compute_cost(onnx_model, [node.name for node in computation_nodes])
-    return shape_inference.infer_shapes(onnx_model), compute_cost
+    checkpoint_shape = get_shape(checkpoint, onnx_model)
+    checkpoint_mem = prod(checkpoint_shape) * 2
+    return shape_inference.infer_shapes(onnx_model), compute_cost, checkpoint_mem
 
 
 def apply_onnx_pass(output_path="./", check=True, model=None):
