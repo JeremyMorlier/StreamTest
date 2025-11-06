@@ -227,7 +227,7 @@ def generate_model(output_path):
             torch.nn.init.kaiming_uniform_(param)
         else:
             torch.nn.init.uniform(param, 3, 4)
-    torch_input = torch.randn(32, 3, 224, 224)
+    torch_input = torch.randn(1, 3, 224, 224)
     torch.onnx.export(model, torch_input, model_path, opset_version=13)
     shape_inference.infer_shapes_path(model_path, model_path)
 
