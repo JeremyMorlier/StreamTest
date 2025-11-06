@@ -305,16 +305,21 @@ if __name__ == "__main__":
     Path(output_path).mkdir(parents=True, exist_ok=True)
     optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
 
-    logging.disable(logging.INFO)
+    _logging_format = "%(asctime)s - %(name)s.%(funcName)s +%(lineno)s - %(levelname)s - %(message)s"
+    logging.basicConfig(format=_logging_format)
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.CRITICAL)
     error_handler = logging.FileHandler("error.log")
     error_handler.setLevel(logging.ERROR)
     info_handler = logging.FileHandler("log.log")
     info_handler.setLevel(logging.INFO)
+    warning_handler = logging.FileHandler("warning.log")
+    warning_handler.setLevel(logging.WARNING)
     logging.getLogger().addHandler(stream_handler)
     logging.getLogger().addHandler(error_handler)
     logging.getLogger().addHandler(info_handler)
+    logging.getLogger().addHandler(warning_handler)
+
     # test(output_path)
     # Run the optimization
     problem = ActivationCheckpointingProblem(
