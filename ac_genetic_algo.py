@@ -2,17 +2,20 @@ import csv
 import logging
 import os
 import shutil
+import traceback
 from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool
 from os import getpid
 from pathlib import Path
 from typing import Literal
 
+import onnx
 import onnxruntime as ort
 import torch
+from onnx import shape_inference
 from onnxruntime.training import artifacts
 from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.core.problem import ElementwiseProblem, Problem, StarmapParallelization
+from pymoo.core.problem import Problem
 from pymoo.operators.crossover.binx import BinomialCrossover
 from pymoo.operators.mutation.bitflip import BitflipMutation
 from pymoo.operators.sampling.rnd import BinaryRandomSampling
@@ -20,7 +23,6 @@ from pymoo.optimize import minimize
 from pymoo.visualization.scatter import Scatter
 from stream.api import _sanity_check_inputs
 from stream.cost_model.cost_model import StreamCostModelEvaluation
-from stream.stages.allocation.constraint_optimization_allocation import ConstraintOptimizationAllocationStage
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
 from stream.stages.estimation.zigzag_core_mapping_estimation import ZigZagCoreMappingEstimationStage
 from stream.stages.generation.layer_stacks_generation import LayerStacksGenerationStage
@@ -32,19 +34,15 @@ from stream.stages.parsing.onnx_model_parser import ONNXModelParserStage as Stre
 from stream.stages.set_fixed_allocation_performance import SetFixedAllocationPerformanceStage
 from stream.stages.stage import MainStage
 from zigzag.mapping.temporal_mapping import TemporalMappingType
-from zigzag.utils import pickle_load, pickle_save
+from zigzag.utils import pickle_save
 
-import onnx
 from model.resnet18 import ResNet18
 from model.resnet224 import ResNet18_224
-from onnx import shape_inference
 from process_onnx import (
     split_forward_backward,
 )
 from test_ac import apply_onnx_pass, remove_checkpoint
 from tools import get_max_offchip_memory, run_stream
-
-ort.set_default_logger_severity(3)
 
 
 def apply_activation_checkpointing(model, recomputations, forward_outputs, forward_inputs):
@@ -136,7 +134,8 @@ class ActivationCheckpointingProblem(Problem):
                 id=bool_list_to_string(x),
             )
         except Exception as e:
-            logging.error(e)
+            error_msg = traceback.format_exc()
+            logging.error(f"{e}, trace {error_msg}")
         logging.error(f"{id} {latency} {energy}, {saved_memory}")
         return latency, energy, -saved_memory
 
@@ -304,6 +303,8 @@ if __name__ == "__main__":
 
     Path(output_path).mkdir(parents=True, exist_ok=True)
     optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
+
+    ort.set_default_logger_severity(3)
 
     _logging_format = "%(asctime)s - %(name)s.%(funcName)s +%(lineno)s - %(levelname)s - %(message)s"
     logging.basicConfig(format=_logging_format)
