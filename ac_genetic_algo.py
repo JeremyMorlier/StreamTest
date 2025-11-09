@@ -103,7 +103,6 @@ class ActivationCheckpointingProblem(Problem):
         Path(folder).mkdir(parents=True, exist_ok=True)
         shutil.copyfile(model_path, f"{folder}model.onnx")
 
-        latency, energy, memory, saved_memory = 0, 0, 0, 0
         try:
             # Generate the ONNX based on X
             recomputations = []
@@ -134,6 +133,7 @@ class ActivationCheckpointingProblem(Problem):
                 id=bool_list_to_string(x),
             )
         except Exception as e:
+            latency, energy, memory, saved_memory = 1e30, 1e30, 1e30, 1e30
             error_msg = traceback.format_exc()
             logging.error(f"{e}, trace {error_msg}")
         logging.error(f"{id} {latency} {energy}, {saved_memory}")
@@ -256,49 +256,49 @@ def generate_model(output_path):
     return optimization_vars, train_onnx_path, forward_inputs, forward_outputs
 
 
-def test(output_path):
-    optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
-    import random
+# def test(output_path):
+#     optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
+#     import random
 
-    n = len(optimization_vars)
-    x = random.choices([False, True], k=n)
-    # x =[False, True, True, False, False]
-    # Generate the ONNX based on X
-    recomputations = []
-    for variable, activations in zip(x, optimization_vars, strict=True):
-        if variable:
-            recomputations.append([activations, optimization_vars[activations]])
-    # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
-    recomputations.reverse()
-    # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
-    onnx_model = onnx.load(model_path)
-    checkpointed_model = apply_activation_checkpointing(onnx_model, recomputations, forward_outputs, forward_inputs)
-    onnx.save(checkpointed_model, f"{output_path}checkpointed.onnx")
-    processed_model_path, forward_path, backward_pass, opt_pass = apply_onnx_pass(
-        output_path=f"{output_path}/", model=checkpointed_model
-    )
-    accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
-    # Evaluate with Stream
-    latency, energy, memory = optimize_allocation_ga_no_id(
-        accelerator_path,
-        processed_model_path,
-        mapping_path,
-        mode="fused",
-        layer_stacks=None,
-        nb_ga_generations=4,
-        nb_ga_individuals=4,
-        output_path=f"{output_path}",
-        id=x,
-    )
-    return latency, energy, memory
+#     n = len(optimization_vars)
+#     x = random.choices([False, True], k=n)
+#     # x =[False, True, True, False, False]
+#     # Generate the ONNX based on X
+#     recomputations = []
+#     for variable, activations in zip(x, optimization_vars, strict=True):
+#         if variable:
+#             recomputations.append([activations, optimization_vars[activations]])
+#     # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
+#     recomputations.reverse()
+#     # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
+#     onnx_model = onnx.load(model_path)
+#     checkpointed_model = apply_activation_checkpointing(onnx_model, recomputations, forward_outputs, forward_inputs)
+#     onnx.save(checkpointed_model, f"{output_path}checkpointed.onnx")
+#     processed_model_path, forward_path, backward_pass, opt_pass = apply_onnx_pass(
+#         output_path=f"{output_path}/", model=checkpointed_model
+#     )
+#     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
+#     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
+#     # Evaluate with Stream
+#     latency, energy, memory = optimize_allocation_ga_no_id(
+#         accelerator_path,
+#         processed_model_path,
+#         mapping_path,
+#         mode="fused",
+#         layer_stacks=None,
+#         nb_ga_generations=4,
+#         nb_ga_individuals=4,
+#         output_path=f"{output_path}",
+#         id=x,
+#     )
+#     return latency, energy, memory
 
-    return 0
+#     return 0
 
 
 if __name__ == "__main__":
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise.yaml"
+    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
     output_path = "results/ga_ac/"
 
     Path(output_path).mkdir(parents=True, exist_ok=True)
@@ -310,11 +310,11 @@ if __name__ == "__main__":
     logging.basicConfig(format=_logging_format)
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.CRITICAL)
-    error_handler = logging.FileHandler("error.log")
+    error_handler = logging.FileHandler("error_09_11_2025.log")
     error_handler.setLevel(logging.ERROR)
-    info_handler = logging.FileHandler("log.log")
+    info_handler = logging.FileHandler("log_09_11_2025.log")
     info_handler.setLevel(logging.INFO)
-    warning_handler = logging.FileHandler("warning.log")
+    warning_handler = logging.FileHandler("warning_09_11_2025.log")
     warning_handler.setLevel(logging.WARNING)
     logging.getLogger().addHandler(stream_handler)
     logging.getLogger().addHandler(error_handler)
@@ -331,7 +331,7 @@ if __name__ == "__main__":
         accelerator_path,
         mapping_path,
         output_path,
-        processes=2,
+        processes=6,
     )
 
     algorithm = NSGA2(

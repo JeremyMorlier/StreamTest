@@ -172,13 +172,13 @@ def generate_model(output_path):
     model_path = f"{output_path}model.onnx"
     train_onnx_path = f"{output_path}training_model.onnx"
     # Generate, Export and Infer Shapes of a ResNet18 Model
-    model = ResNet18()
+    model = ResNet18_224()
     for param in model.parameters():
         if param.dim() > 1:  # Weights
             torch.nn.init.kaiming_uniform_(param)
         else:
             torch.nn.init.uniform(param, 3, 4)
-    torch_input = torch.randn(32, 3, 32, 32)
+    torch_input = torch.randn(1, 3, 224, 224)
     torch.onnx.export(model, torch_input, model_path, opset_version=13)
 
     shape_inference.infer_shapes_path(model_path, model_path)
@@ -233,7 +233,7 @@ def single_stream_eval(
     Path(folder).mkdir(parents=True, exist_ok=True)
     shutil.copyfile(model_path, f"{folder}model.onnx")
 
-    latency, energy, memory = 0, 0, 0
+    latency, energy, memory, total_memory_cost = 0, 0, 0, 0
     try:
         # Generate the ONNX based on X
         recomputations = []
@@ -306,22 +306,21 @@ def multiprocess_evaluations(
 if __name__ == "__main__":
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
-    output_path = "results/verify_ac_3/"
+    output_path = "results/verify_ac/"
 
     Path(output_path).mkdir(parents=True, exist_ok=True)
     optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
 
-    # logging.disable(logging.INFO)
-    # stream_handler = logging.StreamHandler()
-    # stream_handler.setLevel(logging.CRITICAL)
-    # error_handler = logging.FileHandler("error2.log")
-    # error_handler.setLevel(logging.ERROR)
-    # info_handler = logging.FileHandler("log2.log")
-    # info_handler.setLevel(logging.INFO)
-    # logging.getLogger().addHandler(stream_handler)
-    # logging.getLogger().addHandler(error_handler)
-    # logging.getLogger().addHandler(info_handler)
-    # test(output_path)
+    logging.disable(logging.INFO)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.CRITICAL)
+    error_handler = logging.FileHandler("error2.log")
+    error_handler.setLevel(logging.ERROR)
+    info_handler = logging.FileHandler("log2.log")
+    info_handler.setLevel(logging.INFO)
+    logging.getLogger().addHandler(stream_handler)
+    logging.getLogger().addHandler(error_handler)
+    logging.getLogger().addHandler(info_handler)
 
     n_vars = len(optimization_vars)
     out_x = {}
@@ -360,22 +359,22 @@ if __name__ == "__main__":
     #     )
     # )
     x = [
+        True,
+        False,
+        False,
+        True,
+        False,
+        False,
+        True,
+        True,
         False,
         False,
         False,
+        True,
         False,
+        True,
         False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
+        True,
         False,
         False,
     ]
@@ -395,19 +394,19 @@ if __name__ == "__main__":
         True,
         False,
         False,
+        True,
+        False,
+        False,
+        True,
+        True,
+        True,
         False,
         False,
         False,
         False,
+        True,
         False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
+        True,
         False,
         False,
     ]
