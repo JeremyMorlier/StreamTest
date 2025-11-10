@@ -43,6 +43,14 @@ from process_onnx import (
 )
 from test_ac import apply_onnx_pass, remove_checkpoint
 from tools import get_max_offchip_memory, run_stream
+import argparse
+
+
+def argparser():
+    parser = argparse.ArgumentParser(description="Stream Hardware Search for ResNet18")
+    parser.add_argument("--output_path", type=str, default="onnx/output/", help="Path to the output directory")
+    parser.add_argument("--processes", type=int, default=6, help="number of processes")
+    return parser.parse_args()
 
 
 def apply_activation_checkpointing(model, recomputations, forward_outputs, forward_inputs):
@@ -297,6 +305,7 @@ def generate_model(output_path):
 
 
 if __name__ == "__main__":
+    args = argparser()
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
     output_path = "results/ga_ac/"
@@ -331,7 +340,7 @@ if __name__ == "__main__":
         accelerator_path,
         mapping_path,
         output_path,
-        processes=6,
+        processes=args.processes,
     )
 
     algorithm = NSGA2(
