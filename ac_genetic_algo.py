@@ -49,7 +49,7 @@ import argparse
 def argparser():
     parser = argparse.ArgumentParser(description="Stream Hardware Search for ResNet18")
     parser.add_argument("--output_path", type=str, default="onnx/output/", help="Path to the output directory")
-    parser.add_argument("--processes", type=int, default=6, help="number of processes")
+    parser.add_argument("--processes", type=int, required=True, help="number of processes")
     return parser.parse_args()
 
 

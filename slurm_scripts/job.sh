@@ -12,4 +12,4 @@
 
 cd /users/local/j20morli/StreamTest
 source .venvbatch/bin/activate
-srun python3 ac_genetic_algo.py
+srun python3 ac_genetic_algo.py --processes 32
