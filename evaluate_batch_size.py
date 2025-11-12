@@ -45,7 +45,7 @@ def evaluate(batch_size, soc_path, mapping_path, folder):
         mode="fused",
         layer_stacks=layer_stacks,
     )
-    result.append(batch_size, energy, latency, memory)
+    return batch_size, energy, latency, memory
 
 
 if __name__ == "__main__":
