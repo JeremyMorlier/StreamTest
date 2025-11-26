@@ -1,0 +1,978 @@
+- name: default
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/MatMul
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn/Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn/MatMul_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn/Add_2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/MatMul_2
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn/Gemm
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/linear1/MatMul
+  core_allocation:
+  - 0
+  intra_core_tiling:
+
+  - D, all
+- name: /transformer/layers.0/linear1/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/Relu
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/linear2/MatMul
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/linear2/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/Add_1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/MatMul
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn_1/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/MatMul_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn_1/Add_2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn_1/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn_1/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn_1/Softmax
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn_1/MatMul_2
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn_1/Gemm
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0_1/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/linear1_1/MatMul
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/linear1_1/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0_1/Relu
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/linear2_1/MatMul
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+
+- name: /transformer/layers.0/linear2_1/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0_1/Add_1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /fc_out/MatMul
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /fc_out/Add
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: onnx::SoftmaxCrossEntropyLoss::4_Grad/SoftmaxCrossEntropyLossGrad_0
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: ReduceSum
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: Sub
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /fc_out/MatMul_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/linear2_1/MatMul_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0_1/Relu_Grad/ReluGrad_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/linear1_1/MatMul_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: AccumulateGrad_/transformer/layers.0_1/Add_output_0_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/Gemm_Grad/Gemm_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn_1/Gemm_Grad/Gemm_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn_1/MatMul_2_Grad/FusedMatMul_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn_1/MatMul_2_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: ReduceSum
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: Sub
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/MatMul_1_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn_1/Mul_Grad/Mul_0
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/MatMul_1_Grad/FusedMatMul_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn_1/MatMul_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: AccumulateGrad_/transformer/layers.0/Add_1_output_0_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/linear2/MatMul_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/Relu_Grad/ReluGrad_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/linear1/MatMul_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: AccumulateGrad_/transformer/layers.0/Add_output_0_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn/Gemm_Grad/Gemm_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: AccumulateGrad_transformer.layers.0.self_attn.out_proj.weight_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/MatMul_Grad/Gemm_5
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/Gemm_Grad/Gemm_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/MatMul_2_Grad/FusedMatMul_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn/MatMul_2_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: ReduceSum
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: Sub
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Mul
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn/MatMul_1_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn/Mul_Grad/Mul_0
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn/MatMul_1_Grad/FusedMatMul_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn/MatMul_Grad/Gemm_5
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: AccumulateGrad_onnx::MatMul_298_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: /transformer/layers.0/self_attn/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: /transformer/layers.0/linear2_1/MatMul_Grad/Gemm_5
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/linear2/MatMul_Grad/Gemm_5
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: AccumulateGrad_onnx::MatMul_325_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/self_attn_1/Gemm_Grad/ReduceSum_3
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/self_attn/Gemm_Grad/ReduceSum_3
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: /transformer/layers.0/linear1_1/MatMul_Grad/Gemm_5
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/linear1/MatMul_Grad/Gemm_5
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: AccumulateGrad_onnx::MatMul_324_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /transformer/layers.0/linear1_1/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: /transformer/layers.0/linear1/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: /transformer/layers.0/linear2_1/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: /transformer/layers.0/linear2/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: /fc_out/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: /fc_out/MatMul_Grad/Gemm_5
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - D, all
+- name: /transformer/layers.0/self_attn/MatMul_Grad/FusedMatMul_0
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - C, all
+
+- name: AccumulateGrad_/pos_encoder/Add_output_0_grad
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: /pos_encoder/Add_Grad/ReduceSum_1
+  core_allocation:
+  - 0
+  intra_core_tiling:
+  - K, all
+- name: Sum_Grad_transformer.layers.0.self_attn.out_proj.weight
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_MulFirstMoment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_MulFirstMoment2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_First_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_MeanFirst_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_Mul3
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_Mul2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_Mul1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_Second_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_MeanSecond_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_second_moment1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight_second_moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_transformer.layers.0.self_attn.out_proj.weight
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Update_transformer.layers.0.self_attn.out_proj.weight
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Sum_Grad_onnx::Add_297
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_MulFirstMoment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_MulFirstMoment2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_First_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_MeanFirst_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_Mul3
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_Mul2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_Mul1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_Second_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_MeanSecond_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_second_moment1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297_second_moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::Add_297
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Update_onnx::Add_297
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Sum_Grad_onnx::MatMul_298
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_MulFirstMoment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_MulFirstMoment2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_First_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_MeanFirst_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_Mul3
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_Mul2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_Mul1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_Second_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_MeanSecond_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_second_moment1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298_second_moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_298
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Update_onnx::MatMul_298
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Sum_Grad_onnx::MatMul_324
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_MulFirstMoment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_MulFirstMoment2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_First_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_MeanFirst_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_Mul3
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_Mul2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_Mul1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_Second_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_MeanSecond_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_second_moment1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324_second_moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_324
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Update_onnx::MatMul_324
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Sum_Grad_onnx::MatMul_325
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_MulFirstMoment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_MulFirstMoment2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_First_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_MeanFirst_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_Mul3
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_Mul2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_Mul1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_Second_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_MeanSecond_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_second_moment1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325_second_moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_325
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Update_onnx::MatMul_325
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Sum_Grad_onnx::MatMul_354
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_MulFirstMoment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_MulFirstMoment2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_First_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_MeanFirst_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_Mul3
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_Mul2
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_Mul1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_Second_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_MeanSecond_Moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_second_moment1
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354_second_moment
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Optimizer_onnx::MatMul_354
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all
+- name: Adam_Update_onnx::MatMul_354
+  core_allocation:
+  - 1
+  intra_core_tiling:
+  - H, all

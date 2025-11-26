@@ -12,7 +12,7 @@ from typing import Literal
 
 import onnxruntime as ort
 import torch
-from stream.api import _sanity_check_inputs
+from stream.api import _sanity_check_inputs, optimize_allocation_co
 from stream.cost_model.cost_model import StreamCostModelEvaluation
 from stream.stages.allocation.constraint_optimization_allocation import ConstraintOptimizationAllocationStage
 from stream.stages.allocation.genetic_algorithm_allocation import GeneticAlgorithmAllocationStage
@@ -33,7 +33,7 @@ from hardware_gen.fusemax_hardware_generator import generate_fusemax_mapping, ge
 from model.mini_llm import MiniTransformerLM
 from tools import apply_onnx_passes
 
-_logging.basicConfig(level=_logging.ERROR)
+# _logging.basicConfig(level=_logging.ERROR)
 # Set the logging level to ERROR to suppress warnings
 ort.set_default_logger_severity(3)
 
@@ -197,7 +197,7 @@ def evaluate_performance(config):
 
     # Generate Hardware and Mapping Config
     _, mapping_path = generate_fusemax_mapping(folder, hardware_config["XPEs"])
-    mapping_path = "mapping.yaml"
+    mapping_path = "mapping_minigpt22_co.yaml"
     # Copy Necessary Files
     shutil.copyfile(forward_backward_path, f"{folder}/training.onnx")
     shutil.copyfile(forward_path, f"{folder}/forward.onnx")
@@ -222,6 +222,7 @@ def evaluate_performance(config):
     )
     result["forwardbackward"]["energy"] = scme.energy
     result["forwardbackward"]["latency"] = scme.latency
+    print(scme.latency, scme.energy)
     try:
         scme = optimize_allocation_ga_no_id(
             hardware=soc_yaml_path,
@@ -237,7 +238,7 @@ def evaluate_performance(config):
         )
         result["forward"]["energy"] = scme.energy
         result["forward"]["latency"] = scme.latency
-
+        print(scme.latency, scme.energy)
     except Exception as e:
         _logging.error(f"Error: {e}")
         print(f"Error: {e}")
@@ -257,7 +258,7 @@ if __name__ == "__main__":
     args = argparser()
     folder = args.output_path
 
-    logger = _logging.getLogger(__name__)
+    # logger = _logging.getLogger(__name__)
 
     # _logging.disable(_logging.CRITICAL)
     # stream_handler = _logging.StreamHandler()
@@ -278,12 +279,19 @@ if __name__ == "__main__":
     layer_stacks = None
     # Example usage of similar to LLama2
 
-    num_layers = 12
+    num_layers = 2
     nhead = 12
     dim_feedforward = 4 * 768
     vocab_size = 53000
     d_model = 768
     max_seq_len = 1024
+
+    num_layers = 2
+    nhead = 3
+    dim_feedforward = 4 * 192
+    vocab_size = 10000
+    d_model = 192
+    max_seq_len = 128
     # Dummy input (batch_size=1, seq_len=10)
     dummy_input = torch.randint(0, vocab_size, (100, max_seq_len))
 
@@ -319,16 +327,16 @@ if __name__ == "__main__":
     # skip the embedding layer
     for init in inits[1:]:
         requires_grad.append(init.name)
-    model_path, _, _, _ = apply_onnx_passes(base_model, dummy_input, output_path, requires_grad, mode="onnx")
+    model_path, forward_path, _, _ = apply_onnx_passes(base_model, dummy_input, output_path, requires_grad, mode="onnx")
 
-    prepared_model_path = "onnx/main_model.onnx"
+    # prepared_model_path = "onnx/main_model.onnx"
     # Evaluate using Stream
     hw_choices = {
         "XPEs": [64, 128, 256, 512],
         "YPEs": [64, 128, 256, 512],
         "VectorPEs": [32, 64, 128, 256],
         "BufferBandwidth": [2048, 4096, 8192, 16384],
-        "BufferSize": [int(int(element * 1024 * 1024 * 8)) for element in [4, 8, 16, 32]],
+        "BufferSize": [int(int(element * 1024 * 1024 * 8)) for element in [16, 32]],
         "OffchipBandwidth": [512, 1024, 2048, 4096, 8192],
     }
 
@@ -342,17 +350,18 @@ if __name__ == "__main__":
         None,
         None,
         output_path,
-        "onnx/forward.onnx",
-        prepared_model_path,
+        forward_path,
+        model_path,
     )
     id = 0
 
     config_iterator = iter(config_generator)
     for config in config_iterator:
         evaluate_performance(config)
-    with Pool(processes=num_workers) as pool:
-        r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
-        print(r)
+        break
+    # with Pool(processes=num_workers) as pool:
+    #     r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
+    #     print(r)
     # r = process_map(evaluate_performance, config_iterator, max_workers=num_workers, chunksize=chunksize)
     # print(r)
     # for config in Config_Generator:
