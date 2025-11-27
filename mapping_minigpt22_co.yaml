@@ -198,6 +198,7 @@
   - 0
   intra_core_tiling:
   - C, all
+  - B, 20
 
 - name: /fc_out/Add
   core_allocation:
