@@ -18,8 +18,9 @@ from process_onnx import (
     process_concat_nodes,
     process_convolution_grad,
     process_poolgrad,
-    split_forward_backward,
     process_sum_nodes,
+    remove_unused_branches,
+    split_forward_backward,
 )
 
 
@@ -182,7 +183,6 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
     inferred_train_onnx_path2 = os.path.join(output_path, "model2.onnx")
     inferred_train_onnx_path3 = os.path.join(output_path, "model3.onnx")
     inferred_train_onnx_path4 = os.path.join(output_path, "model4.onnx")
-    inferred_train_onnx_path5 = os.path.join(output_path, "model5.onnx")
 
     # submodels paths
     forward_onnx_path = os.path.join(output_path, "forward.onnx")
@@ -230,6 +230,7 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
 
     model_simplified, check = simplify(process2, skipped_optimizers=["extract_constant_to_initializer"])
     process3 = process_1d_nodes(model_simplified)
+    process3 = remove_unused_branches(process3)
     process3 = shape_inference.infer_shapes(process3)
     onnx.save(process3, inferred_train_onnx_path3)
     if check:

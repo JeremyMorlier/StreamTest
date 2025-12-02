@@ -293,7 +293,7 @@ if __name__ == "__main__":
     d_model = 192
     max_seq_len = 128
     # Dummy input (batch_size=1, seq_len=10)
-    dummy_input = torch.randint(0, vocab_size, (100, max_seq_len))
+    dummy_input = torch.randint(0, vocab_size, (1, max_seq_len))
 
     model = MiniTransformerLM(
         vocab_size=vocab_size,

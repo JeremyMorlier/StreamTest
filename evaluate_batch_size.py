@@ -36,7 +36,7 @@ def evaluate(batch_size, soc_path, mapping_path, folder):
     )
     layer_stacks = None
 
-    energy, latency, memory = run_stream(
+    energy, latency, memory = run_stream_co(
         inferred_train_onnx_path4,
         soc_path,
         mapping_path,
@@ -57,13 +57,15 @@ if __name__ == "__main__":
     # Generate, Export and Infer Shapes of a ResNet18 Model
 
     result = []
-    batch_sizes = [1, 4, 16, 32, 64, 128]
+    batch_sizes = [128]
 
     args = [(batch_size, soc_path, mapping_path, f"{folder}/{batch_size}/") for batch_size in batch_sizes]
 
+    res = evaluate(128, soc_path, mapping_path, f"{folder}/{128}/")
+    print(res)
     # Use Pool to parallelize the evaluations
-    with Pool(processes=len(batch_sizes)) as pool:
-        r = pool.starmap(evaluate, args)
+    # with Pool(processes=len(batch_sizes)) as pool:
+    #     r = pool.starmap(evaluate, args)
 
-    print(r)
+    # print(r)
     # print(energy, latency, memory, energy2, latency2, memory2)
