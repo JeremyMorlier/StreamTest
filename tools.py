@@ -230,7 +230,7 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
 
     model_simplified, check = simplify(process2, skipped_optimizers=["extract_constant_to_initializer"])
     process3 = process_1d_nodes(model_simplified)
-    process3 = remove_unused_branches(process3)
+    # process3 = remove_unused_branches(process3)
     process3 = shape_inference.infer_shapes(process3)
     onnx.save(process3, inferred_train_onnx_path3)
     if check:
