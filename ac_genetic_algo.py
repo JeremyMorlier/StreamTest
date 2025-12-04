@@ -84,6 +84,7 @@ class ActivationCheckpointingProblem(Problem):
         mapping_path,
         output_path,
         processes,
+        mode="fused",
     ):
         self.optimization_vars = optimization_vars
         self.model_path = model_path
@@ -92,6 +93,7 @@ class ActivationCheckpointingProblem(Problem):
         self.output_path = output_path
         self.forward_inputs = forward_inputs
         self.forward_outputs = forward_outputs
+        self.mode = mode
 
         # Parallelization
         self.processes = processes
@@ -108,16 +110,16 @@ class ActivationCheckpointingProblem(Problem):
     def single_stream_eval(self, x):
         # Get the process ID for tracking
         pid = getpid()
-        folder = f"{output_path}{pid}/"
+        folder = f"{self.output_path}{pid}/"
         Path(folder).mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(model_path, f"{folder}model.onnx")
+        shutil.copyfile(self.model_path, f"{folder}model.onnx")
 
         try:
             # Generate the ONNX based on X
             recomputations = []
-            for variable, activations in zip(x, optimization_vars, strict=True):
+            for variable, activations in zip(x, self.optimization_vars, strict=True):
                 if variable:
-                    recomputations.append([activations, optimization_vars[activations]])
+                    recomputations.append([activations, self.optimization_vars[activations]])
 
             recomputations.reverse()
             onnx_model = onnx.load(f"{folder}model.onnx")
@@ -134,7 +136,7 @@ class ActivationCheckpointingProblem(Problem):
                 self.accelerator_path,
                 processed_model_path,
                 self.mapping_path,
-                mode="fused",
+                mode=self.mode,
                 layer_stacks=None,
                 nb_ga_generations=4,
                 nb_ga_individuals=4,
@@ -305,8 +307,7 @@ def generate_model(output_path):
 #     return 0
 
 
-if __name__ == "__main__":
-    args = argparser()
+def main(args):
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
     output_path = "results/ga_ac/"
@@ -342,6 +343,7 @@ if __name__ == "__main__":
         mapping_path,
         output_path,
         processes=args.processes,
+        mode="fused",
     )
 
     algorithm = NSGA2(
@@ -391,3 +393,8 @@ if __name__ == "__main__":
         logging.error(e)
 
     logging.critical(f"{best_pop_f}, {best_pop_x}, {best_x}, {best_f}")
+
+
+if __name__ == "__main__":
+    args = argparser()
+    main(args)

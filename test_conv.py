@@ -26,8 +26,8 @@ if __name__ == "__main__":
 
     # Generate, Export and Infer Shapes of a ResNet18 Model
 
-    model = ResNet18_224()
-    torch_input = torch.randn(1, 3, 224, 224)
+    model = ResNet18()
+    torch_input = torch.randn(1, 3, 32, 32)
     torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
     inferred_model = shape_inference.infer_shapes_path(onnx_path, infered_path)
 
@@ -36,10 +36,7 @@ if __name__ == "__main__":
     inits = base_model.graph.initializer
     requires_grad = []
     for init in inits:
-        # if len(init.dims) != 1 :
         print(init.name)
-        # if "conv1" in init.name:
-        #     requires_grad.append(init.name)
         requires_grad.append(init.name)
     loss = artifacts.LossType(2)
     print(requires_grad)
@@ -67,22 +64,22 @@ if __name__ == "__main__":
     #     (35, 37, 38, 45, 46, 47),
     #     (48,),
     # ]
-    energy, latency, memory = run_stream(
-        inferred_train_onnx_path4,
-        soc_path,
-        mapping_path,
-        id=105,
-        output_path=folder,
-        mode="lbl",
-        layer_stacks=layer_stacks,
-    )
+    # energy, latency, memory = run_stream(
+    #     inferred_train_onnx_path4,
+    #     soc_path,
+    #     mapping_path,
+    #     id=105,
+    #     output_path=folder,
+    #     mode="lbl",
+    #     layer_stacks=layer_stacks,
+    # )
     energy2, latency2, memory2 = run_stream(
         inferred_train_onnx_path4,
         soc_path,
         mapping_path,
-        id=107,
+        id=111,
         output_path=folder,
         mode="fused",
         layer_stacks=layer_stacks,
     )
-    print(energy, latency, memory, energy2, latency2, memory2)
+    # print(energy, latency, memory, energy2, latency2, memory2)
