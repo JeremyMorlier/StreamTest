@@ -19,7 +19,6 @@ from process_onnx import (
     process_convolution_grad,
     process_poolgrad,
     process_sum_nodes,
-    remove_unused_branches,
     split_forward_backward,
 )
 
@@ -172,7 +171,9 @@ def run_stream(
     return scme.latency, scme.energy, memory
 
 
-def apply_onnx_passes(torch_model, example_input=None, output_path="./", requires_grad=None, mode="torch", check=True):
+def apply_onnx_passes(  # noqa: PLR0915
+    torch_model, example_input=None, output_path="./", requires_grad=None, mode="torch", check=True, optimizer=True
+):
     # Output Paths to store intermediary models
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
@@ -230,7 +231,6 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
 
     model_simplified, check = simplify(process2, skipped_optimizers=["extract_constant_to_initializer"])
     process3 = process_1d_nodes(model_simplified)
-    # process3 = remove_unused_branches(process3)
     process3 = shape_inference.infer_shapes(process3)
     onnx.save(process3, inferred_train_onnx_path3)
     if check:
@@ -246,13 +246,17 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
     process3 = shape_inference.infer_shapes(process3)
     if check:
         print(onnx.checker.check_model(process3))
-    # Add Optimizer
-    optimizer_model, optimizer_inputs, optimizer_outputs = add_optimizer(process3)
-    onnx.save(optimizer_model, inferred_train_onnx_path4)
 
-    shape_inference.infer_shapes_path(inferred_train_onnx_path4, inferred_train_onnx_path4)
-    if check:
-        print(onnx.checker.check_model(inferred_train_onnx_path4))
+    if optimizer:
+        # Add Optimizer
+        optimizer_model, optimizer_inputs, optimizer_outputs = add_optimizer(process3)
+        onnx.save(optimizer_model, inferred_train_onnx_path4)
+
+        shape_inference.infer_shapes_path(inferred_train_onnx_path4, inferred_train_onnx_path4)
+        if check:
+            print(onnx.checker.check_model(inferred_train_onnx_path4))
+    else:
+        onnx.save(process3, inferred_train_onnx_path4)
 
     # Split Forward, Backward and Optimizer
     onnx_model = onnx.load(inferred_train_onnx_path3)
@@ -278,7 +282,8 @@ def apply_onnx_passes(torch_model, example_input=None, output_path="./", require
     # if check:
     #     print(onnx.checker.check_model(backward_onnx_path))
     # onnx.utils.extract_model(
-    #     inferred_train_onnx_path4, optimizer_onnx_path, list(set(optimizer_inputs)), list(set(optimizer_outputs)), True
+    #     inferred_train_onnx_path4, optimizer_onnx_path, list(set(optimizer_inputs)), list(set(optimizer_outputs)),
+    # True
     # )
     # if check:
     #     print(onnx.checker.check_model(optimizer_onnx_path))
