@@ -28,7 +28,7 @@ def evaluate(batch_size, soc_path, mapping_path, folder, optimizer=True):
     print(requires_grad)
 
     inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
-        base_model, None, folder, requires_grad, "onnx", check=False, optimizer=False
+        base_model, None, folder, requires_grad, "onnx", check=False, optimizer=optimizer
     )
     layer_stacks = None
 
