@@ -7,10 +7,6 @@
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=0 # reserve toute la mémoire
 #SBATCH --time=168:00:00 # temps d'allocation
-#BATCH --nodelist=sl-mee-br-119
-#SBATCH -p AAI
 
-cd /users/local/j20morli/StreamTest
-git pull
 source .venvbatch/bin/activate
 srun python3 evaluate_batch_size.py
