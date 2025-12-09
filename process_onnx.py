@@ -219,6 +219,59 @@ def process_1d_nodes(onnx_model):
     return onnx_model
 
 
+import onnx
+from onnx import helper, shape_inference
+from collections import deque
+
+
+def remove_unused_branches(onnx_model):
+    # Perform shape inference to ensure the graph is complete
+    onnx_model = shape_inference.infer_shapes(onnx_model)
+    graph = onnx_model.graph
+
+    # Get all output names
+    output_names = {output.name for output in graph.output}
+
+    # Initialize a set to keep track of nodes that contribute to outputs
+    contributing_nodes = set()
+
+    # Initialize a set to keep track of all used values (outputs)
+    used_values = set(output_names)
+
+    # Initialize a queue with output nodes
+    queue = deque()
+    for node in graph.node:
+        for output in node.output:
+            if output in output_names:
+                queue.append(node)
+                contributing_nodes.add(node.name + node.op_type)
+                break
+
+    # Traverse the graph backward to find contributing nodes
+    while queue:
+        node = queue.popleft()
+        for input_name in node.input:
+            # Mark this input as used
+            used_values.add(input_name)
+            # Find the producer node for this input
+            for candidate in graph.node:
+                if input_name in candidate.output:
+                    if candidate.name + candidate.op_type not in contributing_nodes:
+                        contributing_nodes.add(candidate.name + candidate.op_type)
+                        queue.append(candidate)
+
+    # Remove nodes that are not in contributing_nodes
+    # We need to iterate backward to avoid index issues when removing
+    for i in range(len(graph.node) - 1, -1, -1):
+        node = graph.node[i]
+        # Check if any output of the node is in used_values
+        used = any(output in used_values for output in node.output)
+        if not used:
+            del graph.node[i]
+
+    return onnx_model
+
+
 def process_convolution_grad(onnx_model):
     """
     Process ConvGrad nodes in the ONNX model to convert them into ConvTranspose nodes and reshape the inputs accordingly.

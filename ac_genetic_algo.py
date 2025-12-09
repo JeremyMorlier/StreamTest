@@ -84,6 +84,7 @@ class ActivationCheckpointingProblem(Problem):
         mapping_path,
         output_path,
         processes,
+        mode="fused",
     ):
         self.optimization_vars = optimization_vars
         self.model_path = model_path
@@ -92,6 +93,7 @@ class ActivationCheckpointingProblem(Problem):
         self.output_path = output_path
         self.forward_inputs = forward_inputs
         self.forward_outputs = forward_outputs
+        self.mode = mode
 
         # Parallelization
         self.processes = processes
@@ -108,16 +110,16 @@ class ActivationCheckpointingProblem(Problem):
     def single_stream_eval(self, x):
         # Get the process ID for tracking
         pid = getpid()
-        folder = f"{output_path}{pid}/"
+        folder = f"{self.output_path}{pid}/"
         Path(folder).mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(model_path, f"{folder}model.onnx")
+        shutil.copyfile(self.model_path, f"{folder}model.onnx")
 
         try:
             # Generate the ONNX based on X
             recomputations = []
-            for variable, activations in zip(x, optimization_vars, strict=True):
+            for variable, activations in zip(x, self.optimization_vars, strict=True):
                 if variable:
-                    recomputations.append([activations, optimization_vars[activations]])
+                    recomputations.append([activations, self.optimization_vars[activations]])
 
             recomputations.reverse()
             onnx_model = onnx.load(f"{folder}model.onnx")
@@ -134,7 +136,7 @@ class ActivationCheckpointingProblem(Problem):
                 self.accelerator_path,
                 processed_model_path,
                 self.mapping_path,
-                mode="fused",
+                mode=self.mode,
                 layer_stacks=None,
                 nb_ga_generations=4,
                 nb_ga_individuals=4,
@@ -265,6 +267,46 @@ def generate_model(output_path):
     return optimization_vars, train_onnx_path, forward_inputs, forward_outputs
 
 
+# def test(output_path):
+#     optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
+#     import random
+
+#     n = len(optimization_vars)
+#     x = random.choices([False, True], k=n)
+#     # x =[False, True, True, False, False]
+#     # Generate the ONNX based on X
+#     recomputations = []
+#     for variable, activations in zip(x, optimization_vars, strict=True):
+#         if variable:
+#             recomputations.append([activations, optimization_vars[activations]])
+#     # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
+#     recomputations.reverse()
+#     # print([(x, [node.name for node in node_li]) for x, node_li in recomputations])
+#     onnx_model = onnx.load(model_path)
+#     checkpointed_model = apply_activation_checkpointing(onnx_model, recomputations, forward_outputs, forward_inputs)
+#     onnx.save(checkpointed_model, f"{output_path}checkpointed.onnx")
+#     processed_model_path, forward_path, backward_pass, opt_pass = apply_onnx_pass(
+#         output_path=f"{output_path}/", model=checkpointed_model
+#     )
+#     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
+#     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"
+#     # Evaluate with Stream
+#     latency, energy, memory = optimize_allocation_ga_no_id(
+#         accelerator_path,
+#         processed_model_path,
+#         mapping_path,
+#         mode="fused",
+#         layer_stacks=None,
+#         nb_ga_generations=4,
+#         nb_ga_individuals=4,
+#         output_path=f"{output_path}",
+#         id=x,
+#     )
+#     return latency, energy, memory
+
+#     return 0
+
+
 if __name__ == "__main__":
     args = argparser()
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
@@ -302,6 +344,7 @@ if __name__ == "__main__":
         mapping_path,
         output_path,
         processes=args.processes,
+        mode="fused",
     )
 
     algorithm = NSGA2(
@@ -351,3 +394,8 @@ if __name__ == "__main__":
         logging.error(e)
 
     logging.critical(f"{best_pop_f}, {best_pop_x}, {best_x}, {best_f}")
+
+
+if __name__ == "__main__":
+    args = argparser()
+    main(args)
