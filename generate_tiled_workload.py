@@ -40,7 +40,7 @@ ort.set_default_logger_severity(3)
 
 def argparser():
     parser = argparse.ArgumentParser(description="Stream Hardware Search for ResNet18")
-    parser.add_argument("--output_path", type=str, default="onnx/output/", help="Path to the output directory")
+    parser.add_argument("--output_path", type=str, default="onnx/output2/", help="Path to the output directory")
 
     return parser.parse_args()
 
@@ -287,13 +287,13 @@ if __name__ == "__main__":
     max_seq_len = 1024
 
     num_layers = 2
-    nhead = 3
-    dim_feedforward = 4 * 192
-    vocab_size = 10000
-    d_model = 192
-    max_seq_len = 128
+    nhead = 6
+    dim_feedforward = 2 * 768
+    vocab_size = 20000
+    d_model = 192 * 2
+    max_seq_len = 128 * 2
     # Dummy input (batch_size=1, seq_len=10)
-    dummy_input = torch.randint(0, vocab_size, (100, max_seq_len))
+    dummy_input = torch.randint(0, vocab_size, (1, max_seq_len))
 
     model = MiniTransformerLM(
         vocab_size=vocab_size,
@@ -341,7 +341,7 @@ if __name__ == "__main__":
     }
 
     num_task = 10000
-    num_workers = min(num_task, int(os.cpu_count() / 3) + 1)
+    num_workers = 8
     chunksize = math.ceil(num_task / num_workers)
 
     config_generator = ConfigGenerator(
@@ -358,7 +358,7 @@ if __name__ == "__main__":
     config_iterator = iter(config_generator)
     for config in config_iterator:
         evaluate_performance(config)
-        break
+    #     break
     # with Pool(processes=num_workers) as pool:
     #     r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
     #     print(r)
