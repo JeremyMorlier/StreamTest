@@ -11,7 +11,10 @@ wheels/
 
 # ONNX Files
 *.onnx
+
+# Log and Results Files
 output/
 onnx/
 onnx*/
 results/
+log/

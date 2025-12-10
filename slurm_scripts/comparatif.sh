@@ -11,4 +11,4 @@
 #SBATCH -p AAI
 
 source .venvbatch/bin/activate
-srun python3 comparatif.py --processes 8
+srun python3 comparatif.py --processes 8 --output_path results/full_resnet/

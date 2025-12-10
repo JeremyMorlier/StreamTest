@@ -168,16 +168,16 @@ def main(args):
         base_model, None, output_path, requires_grad, "onnx", check=False
     )
     layer_stacks = None
-    # energy, latency, memory = run_stream(
-    #     inferred_train_onnx_path4,
-    #     args.accelerator_path,
-    #     args.mapping_path,
-    #     id=1,
-    #     output_path=output_path,
-    #     mode="lbl",
-    #     layer_stacks=layer_stacks,
-    # )
-    # logging.critical(f"{energy}, {latency}, {memory}")
+    energy, latency, memory = run_stream(
+        inferred_train_onnx_path4,
+        args.accelerator_path,
+        args.mapping_path,
+        id=1,
+        output_path=output_path,
+        mode="lbl",
+        layer_stacks=layer_stacks,
+    )
+    logging.critical(f"{energy}, {latency}, {memory}")
     # base config + fused
     output_path = os.path.join(args.output_path, "Base_Fused/")
     Path(output_path).mkdir(parents=True, exist_ok=True)
@@ -200,16 +200,16 @@ def main(args):
         base_model, None, output_path, requires_grad, "onnx", check=False
     )
     layer_stacks = None
-    # energy, latency, memory = run_stream(
-    #     inferred_train_onnx_path4,
-    #     args.accelerator_path,
-    #     args.mapping_path,
-    #     id=1,
-    #     output_path=output_path,
-    #     mode="fused",
-    #     layer_stacks=layer_stacks,
-    # )
-    # logging.critical(f"{energy}, {latency}, {memory}")
+    energy, latency, memory = run_stream(
+        inferred_train_onnx_path4,
+        args.accelerator_path,
+        args.mapping_path,
+        id=1,
+        output_path=output_path,
+        mode="fused",
+        layer_stacks=layer_stacks,
+    )
+    logging.critical(f"{energy}, {latency}, {memory}")
     # base config + AC
     output_path = os.path.join(args.output_path, "Base_AC/")
     Path(output_path).mkdir(parents=True, exist_ok=True)
