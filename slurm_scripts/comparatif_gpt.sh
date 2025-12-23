@@ -11,4 +11,4 @@
 export GRB_LICENSE_FILE=../jobsSlurm/gurobi.llc
 
 source .venvbatch/bin/activate
-srun python3 comparatif.py --processes 8 --output_path results/full_resnet3/ --batch_size 2
+srun python3 comparatif_gpt2.py --processes 4 --output_path results/ca_gpt_sa/ --batch_size 1

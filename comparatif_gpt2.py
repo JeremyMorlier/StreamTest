@@ -14,6 +14,8 @@ from pymoo.optimize import minimize
 
 import onnx
 from ac_genetic_algo import ActivationCheckpointingProblem
+from hardware_gen.fusemax_hardware_generator import generate_fusemax_mapping, generate_soc
+from model.mini_llm import MiniTransformerLM
 from model.resnet224 import ResNet18_224
 from process_onnx import split_forward_backward
 from tools import apply_onnx_passes, run_stream
@@ -24,20 +26,26 @@ def argparser():
     parser.add_argument("--output_path", type=str, default="onnx/output/", help="Path to the output directory")
     parser.add_argument("--processes", type=int, required=True, help="number of processes")
 
-    parser.add_argument(
-        "--accelerator_path",
-        type=str,
-        default="stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml",
-        help="Path to Stream Accelerator",
-    )
-    parser.add_argument(
-        "--mapping_path",
-        type=str,
-        default="stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml",
-        help="Path to Stream Mapping file",
-    )
-
     parser.add_argument("--batch_size", type=int, default=1, help="Batch SIze to evaluate the neural networks")
+
+    # NN configuration
+    parser.add_argument("--num_layers", type=int, default=2, help="Number of layers in the model")
+    parser.add_argument("--nhead", type=int, default=6, help="Number of attention heads")
+    parser.add_argument("--dim_feedforward", type=int, default=2 * 768, help="Dimension of the feedforward network")
+    parser.add_argument("--vocab_size", type=int, default=20000, help="Vocabulary size")
+    parser.add_argument("--d_model", type=int, default=192 * 2, help="Model dimension")
+    parser.add_argument("--max_seq_len", type=int, default=128 * 2, help="Maximum sequence length")
+
+    # Hardware and Mapping configurations
+    parser.add_argument("--XPEs", type=int, default=256, help="Number of X Processing Elements")
+    parser.add_argument("--YPEs", type=int, default=256, help="Number of Y Processing Elements")
+    parser.add_argument("--VectorPEs", type=int, default=128, help="Number of Vector Processing Elements")
+    parser.add_argument("--BufferBandwidth", type=int, default=4096, help="Buffer bandwidth")
+    parser.add_argument("--BufferSize", type=int, default=16 * 1024 * 1024 * 8, help="Buffer size in bytes")
+    parser.add_argument("--OffchipBandwidth", type=int, default=2048, help="Off-chip bandwidth")
+
+    args = parser.parse_args()
+    return args
 
     # GA hyperparameters
     parser.add_argument("--pop_size", type=int, default=20)
@@ -48,24 +56,48 @@ def argparser():
     return parser.parse_args()
 
 
-def generate_model(output_path, batch_size=1):
+def generate_model(output_path, args):
     model_path: str = f"{output_path}model.onnx"
     train_onnx_path = f"{output_path}training_model.onnx"
     # Generate, Export and Infer Shapes of a ResNet18 Model
-    model = ResNet18_224()
+    num_layers = args.num_layers
+    nhead = args.nhead
+    dim_feedforward = args.dim_feedforward
+    vocab_size = args.vocab_size
+    d_model = args.d_model
+    max_seq_len = args.max_seq_len
+    # Dummy input (batch_size=1, seq_len=10)
+    dummy_input = torch.randint(0, vocab_size, (1, max_seq_len))
+
+    model = MiniTransformerLM(
+        vocab_size=vocab_size,
+        max_seq_len=max_seq_len,
+        d_model=d_model,
+        nhead=nhead,
+        num_layers=num_layers,
+        dim_feedforward=dim_feedforward,
+    )
     for param in model.parameters():
         if param.dim() > 1:  # Weights
             torch.nn.init.kaiming_uniform_(param)
         else:
             torch.nn.init.uniform(param, 3, 4)
-    torch_input = torch.randn(batch_size, 3, 224, 224)
-    torch.onnx.export(model, torch_input, model_path, opset_version=13)
-    onnx.shape_inference.infer_shapes_path(model_path, model_path)
+
+    # Export to ONNX
+    torch.onnx.export(
+        model,
+        dummy_input,
+        model_path,
+        input_names=["input"],
+        output_names=["output"],
+        opset_version=16,
+        external_data=True,
+    )
 
     onnx_model = onnx.load(model_path)
     inits = onnx_model.graph.initializer
     requires_grad = []
-    for init in inits:
+    for init in inits[1:]:
         requires_grad.append(init.name)
 
     loss = artifacts.LossType(2)
@@ -153,71 +185,98 @@ def evaluate_activation_checkpointing(
     logging.critical(f"{best_pop_f}, {best_pop_x}, {best_x}, {best_f}")
 
 
+def run(args, output_path="", fused=False):
+    if fused:
+        mode = "fused"
+    else:
+        mode = "lbl"
+    Path(output_path).mkdir(parents=True, exist_ok=True)
+    onnx_path = f"{output_path}/test.onnx"
+
+    # NN configuration
+    num_layers = args.num_layers
+    nhead = args.nhead
+    dim_feedforward = args.dim_feedforward
+    vocab_size = args.vocab_size
+    d_model = args.d_model
+    max_seq_len = args.max_seq_len
+
+    # Hardware and Mapping configurations
+    XPEs = args.XPEs
+    YPEs = args.YPEs
+    VectorPEs = args.VectorPEs
+    BufferBandwidth = args.BufferBandwidth
+    BufferSize = args.BufferSize
+    OffchipBandwidth = args.OffchipBandwidth
+
+    # Generate the soc
+    soc, soc_yaml_path = generate_soc(
+        output_path,
+        XPEs,
+        YPEs,
+        VectorPEs,
+        BufferBandwidth,
+        BufferSize,
+        OffchipBandwidth,
+    )
+    # Generate Hardware and Mapping Config
+    _, mapping_path = generate_fusemax_mapping(output_path, XPEs)
+    # Dummy input (batch_size=1, seq_len=10)
+    dummy_input = torch.randint(0, vocab_size, (1, max_seq_len))
+
+    model = MiniTransformerLM(
+        vocab_size=vocab_size,
+        max_seq_len=max_seq_len,
+        d_model=d_model,
+        nhead=nhead,
+        num_layers=num_layers,
+        dim_feedforward=dim_feedforward,
+    )
+    for param in model.parameters():
+        if param.dim() > 1:  # Weights
+            torch.nn.init.kaiming_uniform_(param)
+        else:
+            torch.nn.init.uniform(param, 3, 4)
+
+    # Export to ONNX
+    torch.onnx.export(
+        model,
+        dummy_input,
+        onnx_path,
+        input_names=["input"],
+        output_names=["output"],
+        opset_version=16,
+        external_data=True,
+    )
+    base_model = onnx.load(onnx_path)
+
+    inits = base_model.graph.initializer
+    requires_grad = []
+    # skip the embedding layer
+    for init in inits[1:]:
+        requires_grad.append(init.name)
+    model_path, forward_path, _, _ = apply_onnx_passes(base_model, dummy_input, output_path, requires_grad, mode="onnx")
+    layer_stacks = None
+    energy, latency, memory = run_stream(
+        model_path,
+        soc_yaml_path,
+        mapping_path,
+        id=1,
+        output_path=output_path,
+        mode=mode,
+        layer_stacks=layer_stacks,
+    )
+    logging.critical(f"{energy}, {latency}, {memory}")
+    return energy, latency, memory
+
+
 def main(args):
     # base config
     output_path = os.path.join(args.output_path, "Base/")
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    onnx_path = f"{output_path}/test.onnx"
-    infered_path = f"{output_path}/inferred.onnx"
-    model = ResNet18_224()
-    torch_input = torch.randn(args.batch_size, 3, 224, 224)
-    torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
-    onnx.shape_inference.infer_shapes_path(onnx_path, infered_path)
-
-    # Generate Backward
-    base_model = onnx.load(infered_path)
-    inits = base_model.graph.initializer
-    requires_grad = []
-    for init in inits:
-        requires_grad.append(init.name)
-
-    # layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
-    inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
-        base_model, None, output_path, requires_grad, "onnx", check=False
-    )
-    layer_stacks = None
-    energy, latency, memory = run_stream(
-        inferred_train_onnx_path4,
-        args.accelerator_path,
-        args.mapping_path,
-        id=1,
-        output_path=output_path,
-        mode="lbl",
-        layer_stacks=layer_stacks,
-    )
-    logging.critical(f"{energy}, {latency}, {memory}")
+    run(args, output_path, False)
     # base config + fused
     output_path = os.path.join(args.output_path, "Base_Fused/")
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    onnx_path = f"{output_path}/test.onnx"
-    infered_path = f"{output_path}/inferred.onnx"
-    model = ResNet18_224()
-    torch_input = torch.randn(args.batch_size, 3, 224, 224)
-    torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
-    onnx.shape_inference.infer_shapes_path(onnx_path, infered_path)
-
-    # Generate Backward
-    base_model = onnx.load(infered_path)
-    inits = base_model.graph.initializer
-    requires_grad = []
-    for init in inits:
-        requires_grad.append(init.name)
-
-    # layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
-    inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
-        base_model, None, output_path, requires_grad, "onnx", check=False
-    )
-    layer_stacks = None
-    energy, latency, memory = run_stream(
-        inferred_train_onnx_path4,
-        args.accelerator_path,
-        args.mapping_path,
-        id=1,
-        output_path=output_path,
-        mode="fused",
-        layer_stacks=layer_stacks,
-    )
-    logging.critical(f"{energy}, {latency}, {memory}")
+    run(args, output_path, True)
     # base config + AC
     output_path = os.path.join(args.output_path, "Base_AC/")
     Path(output_path).mkdir(parents=True, exist_ok=True)

@@ -307,7 +307,7 @@ def generate_model(output_path):
 #     return 0
 
 
-if __name__ == "__main__":
+def main(args):
     args = argparser()
     accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
     mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_fused_ga_elementwise2.yaml"

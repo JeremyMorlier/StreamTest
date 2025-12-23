@@ -311,38 +311,23 @@ def generate_soc(
     return yaml_data, soc_filename
 
 
-def generate_fusemax_mapping(path: str, npes: int = 256):
+def generate_fusemax_mapping(path):
     mapping_filename = os.path.join(path, "mapping.yaml")
     yaml_data = [
-        {
-            "name": "default",
-            "core_allocation": [0],
-            "intra_core_tiling": ["H, all"],
-            "inter_core_tiling": [f"D, {npes}"],
-        },
-        {
-            "name": "Conv",
-            "core_allocation": [0],
-            "intra_core_tiling": ["OY, all"],
-            "inter_core_tiling": ["K, 1"],
-        },
-        {
-            "name": "Gemm",
-            "core_allocation": [0],
-            "intra_core_tiling": ["H, all"],
-            "inter_core_tiling": [f"D, {npes}"],
-        },
-        {
-            "name": "Matmul",
-            "core_allocation": [0],
-            "intra_core_tiling": ["H, all"],
-            "inter_core_tiling": [f"D, {npes}"],
-        },
-        {"name": "Add", "core_allocation": [1], "intra_core_tiling": ["H, all"], "inter_core_tiling": ["B, 1"]},
-        {"name": "Mul", "core_allocation": [1], "intra_core_tiling": ["H, all"], "inter_core_tiling": ["B, 1"]},
-        {"name": "Div", "core_allocation": [1], "intra_core_tiling": ["H, all"], "inter_core_tiling": ["B, 1"]},
-        {"name": "Sqrt", "core_allocation": [1], "intra_core_tiling": ["H, all"], "inter_core_tiling": ["B, 1"]},
-        {"name": "Sub", "core_allocation": [1], "intra_core_tiling": ["H, all"], "inter_core_tiling": ["B, 1"]},
+        {"name": "default", "core_allocation": [0], "intra_core_tiling": ["H, all"]},
+        {"name": "Conv", "core_allocation": [0], "intra_core_tiling": ["OY, all"]},
+        {"name": "Gemm", "core_allocation": [0], "intra_core_tiling": ["D, all"]},
+        {"name": "Matmul", "core_allocation": [0], "intra_core_tiling": ["C, all"]},
+        {"name": "FusedMatMul", "core_allocation": [0], "intra_core_tiling": ["C, all"]},
+        {"name": "Softmax", "core_allocation": [0], "intra_core_tiling": ["D, all"]},
+        {"name": "ReduceSum", "core_allocation": [0], "intra_core_tiling": ["K, all"]},
+        {"name": "Add", "core_allocation": [1], "intra_core_tiling": ["H, all"]},
+        {"name": "SoftmaxCrossEntropyLossGrad", "core_allocation": [1], "intra_core_tiling": ["H, all"]},
+        {"name": "Mul", "core_allocation": [1], "intra_core_tiling": ["H, all"]},
+        {"name": "Div", "core_allocation": [1], "intra_core_tiling": ["H, all"]},
+        {"name": "Sqrt", "core_allocation": [1], "intra_core_tiling": ["H, all"]},
+        {"name": "Sub", "core_allocation": [1], "intra_core_tiling": ["H, all"]},
+        {"name": "/fc_out/MatMul", "core_allocation": [0], "intra_core_tiling": ["C, all", "B, 20"]},
     ]
     to_yaml(yaml_data, mapping_filename)
     return yaml_data, mapping_filename
