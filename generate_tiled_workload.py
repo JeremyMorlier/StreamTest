@@ -194,7 +194,6 @@ def evaluate_performance(config):
         hardware_config["BufferSize"],
         hardware_config["OffchipBandwidth"],
     )
-
     # Generate Hardware and Mapping Config
     _, mapping_path = generate_fusemax_mapping(folder, hardware_config["XPEs"])
     mapping_path = "mapping_minigpt22_co.yaml"
