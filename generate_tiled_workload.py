@@ -202,6 +202,9 @@ def evaluate_performance(config):
     shutil.copyfile(forward_backward_path, f"{folder}/training.onnx")
     shutil.copyfile(forward_path, f"{folder}/forward.onnx")
 
+    for key, value in hardware_config.items():
+        result[key] = value
+    result["mode"] = mode
     result["soc"] = soc
 
     result["forwardbackward"] = {}
