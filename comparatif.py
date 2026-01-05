@@ -155,37 +155,37 @@ def evaluate_activation_checkpointing(
 
 def main(args):
     # base config
-    output_path = os.path.join(args.output_path, "Base/")
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    onnx_path = f"{output_path}/test.onnx"
-    infered_path = f"{output_path}/inferred.onnx"
-    model = ResNet18_224()
-    torch_input = torch.randn(args.batch_size, 3, 224, 224)
-    torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
-    onnx.shape_inference.infer_shapes_path(onnx_path, infered_path)
+    # output_path = os.path.join(args.output_path, "Base/")
+    # Path(output_path).mkdir(parents=True, exist_ok=True)
+    # onnx_path = f"{output_path}/test.onnx"
+    # infered_path = f"{output_path}/inferred.onnx"
+    # model = ResNet18_224()
+    # torch_input = torch.randn(args.batch_size, 3, 224, 224)
+    # torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
+    # onnx.shape_inference.infer_shapes_path(onnx_path, infered_path)
 
-    # Generate Backward
-    base_model = onnx.load(infered_path)
-    inits = base_model.graph.initializer
-    requires_grad = []
-    for init in inits:
-        requires_grad.append(init.name)
+    # # Generate Backward
+    # base_model = onnx.load(infered_path)
+    # inits = base_model.graph.initializer
+    # requires_grad = []
+    # for init in inits:
+    #     requires_grad.append(init.name)
 
-    # layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
-    inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
-        base_model, None, output_path, requires_grad, "onnx", check=False
-    )
-    layer_stacks = None
-    energy, latency, memory = run_stream(
-        inferred_train_onnx_path4,
-        args.accelerator_path,
-        args.mapping_path,
-        id=1,
-        output_path=output_path,
-        mode="lbl",
-        layer_stacks=layer_stacks,
-    )
-    logging.critical(f"{energy}, {latency}, {memory}")
+    # # layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
+    # inferred_train_onnx_path4, forward_path, _, _ = apply_onnx_passes(
+    #     base_model, None, output_path, requires_grad, "onnx", check=False
+    # )
+    # layer_stacks = None
+    # energy, latency, memory = run_stream(
+    #     inferred_train_onnx_path4,
+    #     args.accelerator_path,
+    #     args.mapping_path,
+    #     id=1,
+    #     output_path=output_path,
+    #     mode="lbl",
+    #     layer_stacks=layer_stacks,
+    # )
+    # logging.critical(f"{energy}, {latency}, {memory}")
     # base config + fused
     output_path = os.path.join(args.output_path, "Base_Fused/")
     Path(output_path).mkdir(parents=True, exist_ok=True)
@@ -218,36 +218,36 @@ def main(args):
         layer_stacks=layer_stacks,
     )
     logging.critical(f"{energy}, {latency}, {memory}")
-    # base config + AC
-    output_path = os.path.join(args.output_path, "Base_AC/")
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(
-        output_path, batch_size=args.batch_size
-    )
-    evaluate_activation_checkpointing(
-        optimization_vars=optimization_vars,
-        forward_inputs=forward_inputs,
-        forward_outputs=forward_outputs,
-        output_path=output_path,
-        model_path=model_path,
-        args=args,
-        mode="lbl",
-    )
+    # # base config + AC
+    # output_path = os.path.join(args.output_path, "Base_AC/")
+    # Path(output_path).mkdir(parents=True, exist_ok=True)
+    # optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(
+    #     output_path, batch_size=args.batch_size
+    # )
+    # evaluate_activation_checkpointing(
+    #     optimization_vars=optimization_vars,
+    #     forward_inputs=forward_inputs,
+    #     forward_outputs=forward_outputs,
+    #     output_path=output_path,
+    #     model_path=model_path,
+    #     args=args,
+    #     mode="lbl",
+    # )
     # base config + AC + fused
-    output_path = os.path.join(args.output_path, "Base_AC_Fused/")
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(
-        output_path, batch_size=args.batch_size
-    )
-    evaluate_activation_checkpointing(
-        optimization_vars=optimization_vars,
-        forward_inputs=forward_inputs,
-        forward_outputs=forward_outputs,
-        output_path=output_path,
-        model_path=model_path,
-        args=args,
-        mode="fused",
-    )
+    # output_path = os.path.join(args.output_path, "Base_AC_Fused/")
+    # Path(output_path).mkdir(parents=True, exist_ok=True)
+    # optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(
+    #     output_path, batch_size=args.batch_size
+    # )
+    # evaluate_activation_checkpointing(
+    #     optimization_vars=optimization_vars,
+    #     forward_inputs=forward_inputs,
+    #     forward_outputs=forward_outputs,
+    #     output_path=output_path,
+    #     model_path=model_path,
+    #     args=args,
+    #     mode="fused",
+    # )
 
 
 if __name__ == "__main__":
