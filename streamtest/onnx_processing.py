@@ -1,12 +1,18 @@
-import numpy as np
-from onnx.helper import make_node, make_tensor_value_info
-from zigzag.parser.onnx.utils import get_attribute_ints_with_name, get_onnx_tensor_type
+from pathlib import Path
 
+import numpy as np
 import onnx
-from onnx import TensorProto, helper, numpy_helper
+import torch
+from onnx import TensorProto, helper, numpy_helper, shape_inference
+from onnx.helper import make_node, make_tensor_value_info
+from onnxruntime.training import artifacts
+from onnxsim import simplify
+from zigzag.parser.onnx.utils import get_attribute_ints_with_name, get_onnx_tensor_type
 
 
 # TODO: refactor and split the different functions for clarity and ease of maintenance
+# TODO: consolidate with streamtest.checkpointing.apply_onnx_pass if possible
+
 def shape2tuple(shape):
     return tuple(getattr(d, "dim_value", 0) for d in shape.type.tensor_type.shape.dim)
 
@@ -19,7 +25,7 @@ def get_sliding_window_shape(input_shape, kernel_shape, strides, dilations, padd
     out_w = (input_shape[3] + 2 * padding[1] - dilations[1] * (kernel_shape[1] - 1) - 1) // strides[1] + 1
     kh = kernel_shape[0]
     kw = kernel_shape[1]
-    width = input_shape[3]
+    _ = input_shape[3]
     # Create indices for gathering
 
     h_indices = []
@@ -867,8 +873,10 @@ def add_optimizer(
                 ]
             )
         elif optimizer_name == "SGD":
-            optimizer_inputs.append(weight_name, gradient_buffer_name)
+            optimizer_inputs.append(weight_name)
+            optimizer_inputs.append(gradient_buffer_name)
             final_gradient_name = gradient_buffer_name
+
         optimizer_node_1 = make_node(
             "Mul",
             [final_gradient_name, "learning_rate"],
@@ -883,10 +891,10 @@ def add_optimizer(
         )
         node_list.append(optimizer_node_1)
         node_list.append(optimizer_node_2)
-
         output_tensor = helper.make_tensor_value_info(weight_name + "_optimizer_end", TensorProto.FLOAT, None)
         optimizer_outputs.append(weight_name + "_optimizer_end")
         onnx_model.graph.output.append(output_tensor)
+
     for node in node_list:
         onnx_model.graph.node.append(node)
 
@@ -894,115 +902,170 @@ def add_optimizer(
 
 
 def process_concat_nodes(onnx_model):
-    """
-    Check the ONNX Model for Concat nodes that have more than two inputs and split them as it is not supported in Stream
-    """
+    # Process Concat nodes with more than two inputs by splitting them into multiple Concats
+    new_nodes = []
+    for node in onnx_model.graph.node:
+        if node.op_type == "Concat" and len(node.input) > 2:
+            # Split the Concat into multiple Concats
+            inputs = list(node.input)
+            output = node.output[0]
+            axis = [attr.i for attr in node.attribute if attr.name == "axis"][0]
 
-    for i, node in enumerate(onnx_model.graph.node):
-        if node.op_type in "Concat":
-            n_inputs = len(node.input)
-            k = 0
+            # Create intermediate nodes
+            while len(inputs) > 2:
+                new_output = f"{output}_intermediate_{len(new_nodes)}"
+                new_nodes.append(helper.make_node("Concat", inputs=inputs[:2], outputs=[new_output], axis=axis))
+                inputs = [new_output] + inputs[2:]
 
-            attrs = node.attribute
-            axis = get_attribute_ints_with_name("axis", attrs)
-            # Merge the two inputs with a new concat node until only two inputs left
-            while n_inputs > 2:
-                concat_node = make_node(
-                    "Concat",
-                    [node.input[k], node.input[k + 1]],
-                    [f"{node.name}_intermediary_concat_{k}"],
-                    name=f"{node.name}_intermediary_concat_{k}",
-                    axis=axis,
-                )
-                onnx_model.graph.node.insert(i, concat_node)
-                node.input[0] = f"{node.name}_intermediary_concat_{k}"
-                for l in range(1, len(node.input) - 1):
-                    node.input[l] = node.input[l + 1]
-                del node.input[-1]
-                k += 1
-                n_inputs = len(node.input)
+            # Last Concat node
+            new_nodes.append(helper.make_node("Concat", inputs=inputs, outputs=[output], axis=axis))
+
+            # Remove the original Concat node
+            onnx_model.graph.node.remove(node)
+
+    # Add new nodes to the graph
+    onnx_model.graph.node.extend(new_nodes)
+
     return onnx_model
 
 
 def expand_softmax_grad_node(onnx_model):
-    """
-    Expands an ONNX SoftmaxGrad node into a sequence of ONNX operations.
+    for node in onnx_model.graph.node:
+        if node.op_type == "SoftmaxGrad" or node.op_type == "SoftmaxGrad_13":
+            for input_name in node.input:
+                if input_name != node.output[0]:
+                    input_tensor = get_onnx_tensor_type(input_name, onnx_model)
+                    input_tensor_shape = list(input_tensor.shape)
+            # if input_name != node.output[0]:
+            #     input_tensor = get_onnx_tensor_type(input_name, onnx_model)
+            #     input_tensor_shape = list(input_tensor.shape)
 
-    Args:
-        graph: The ONNX graph containing the SoftmaxGrad node.
-        node: The SoftmaxGrad node to expand.
-        axis_attr: The axis attribute of the SoftmaxGrad node. Defaults to 1 if not provided.
+            # Ensure the input tensor shape is retrieved
+            if not input_tensor_shape:
+                raise ValueError("Input tensor shape could not be determined.")
 
-    Returns:
-        The expanded graph with the SoftmaxGrad node replaced.
-    """
-
-    for i, node in enumerate(onnx_model.graph.node):
-        if any([node_type in node.op_type for node_type in ["SoftmaxGrad", "LogSoftmaxGrad"]]):
-            attrs = node.attribute
-            axis = get_attribute_ints_with_name("axis", attrs, default=-1)
-
-            # Get input and output names
-            Y_name = node.input[0]
-            dY_name = node.input[1]
-            dX_name = node.output[0]
-
-            # Compute reduction_axes in Python
-            n = len(get_onnx_tensor_type(dY_name, onnx_model).shape)
-            if axis < 0:
-                axis = n + axis
-            reduction_axes = list(range(axis, n))
-            onnx_model.graph.initializer.append(
-                make_initializer("ReduceSumTensor" + node.name, reduction_axes, np.int64)
-            )
-            # Generate unique names for intermediate tensors
-            a_name = f"{node.name}_a"
-            b_name = f"{node.name}_b"
-            c_name = f"{node.name}_c"
-            # dy_shape = get_onnx_tensor_type(dY_name, onnx_model).shape
-            # onnx_model.graph.value_info.append(make_tensor_value_info(c_name, TensorProto.FLOAT, dy_shape))
-            # a = Mul(Y, dY)
-            a_node = helper.make_node(
-                "Mul",
-                inputs=[Y_name, dY_name],
-                outputs=[a_name],
+            # Create a new node to expand the output of SoftmaxGrad
+            expanded_output_name = node.output[0] + "_expanded"
+            node_expand = helper.make_node(
+                "Expand",
+                inputs=[node.output[0], node.input[0]],
+                outputs=[expanded_output_name],
+                name=node.name + "_Expand",
             )
 
-            # b = ReduceSum(a, reduction_axes)
-            b_node = helper.make_node(
-                "ReduceSum",
-                inputs=[a_name, "ReduceSumTensor" + node.name],
-                outputs=[b_name],
-            )
-
-            # c = Sub(dY, b)
-            c_node = helper.make_node(
-                "Sub",
-                inputs=[b_name, dY_name],
-                outputs=[c_name],
-            )
-
-            # dX = Mul(Y, c)
-            dX_node = helper.make_node(
-                "Mul",
-                inputs=[Y_name, c_name],
-                outputs=[dX_name],
-            )
-            node_list = [a_node, b_node, c_node, dX_node]
-
-            # Add all nodes to the graph
-            for k, new_node in enumerate(node_list):
-                onnx_model.graph.node.insert(i + k, new_node)
-
-            # Remove the original SoftmaxGrad node
-            onnx_model.graph.node.remove(node)
+            # Replace the output of the SoftmaxGrad node with the expanded output
+            node.output[0] = expanded_output_name
+            # Add the expand node to the graph
+            onnx_model.graph.node.append(node_expand)
 
     return onnx_model
 
 
-if __name__ == "__main__":
-    folder = "onnx/test"
-    onnx_file = f"{folder}/simplified.onnx"
-    result_file = f"{folder}/processed.onnx"
+def apply_onnx_passes(torch_model, example_input=None, output_path="./", requires_grad=None, mode="torch", check=True):
+    # Output Paths to store intermediary models
+    Path(output_path).mkdir(parents=True, exist_ok=True)
 
-    onnx.save(process_1d_nodes(onnx.load(onnx_file)), result_file)
+    onnx_path = f"{output_path}/model.onnx"
+    train_onnx_path = f"{output_path}/training_model.onnx"
+
+    inferred_train_onnx_path1 = f"{output_path}/model1.onnx"
+    inferred_train_onnx_path2 = f"{output_path}/model2.onnx"
+    inferred_train_onnx_path3 = f"{output_path}/model3.onnx"
+    inferred_train_onnx_path4 = f"{output_path}/model4.onnx"
+    inferred_train_onnx_path5 = f"{output_path}/model5.onnx"
+
+    # submodels paths
+    forward_onnx_path = f"{output_path}/forward.onnx"
+    backward_onnx_path = f"{output_path}/backward.onnx"
+    optimizer_onnx_path = f"{output_path}/optimizer.onnx"
+
+    # Export Torch Model to ONNX
+    if "torch" in mode:
+        onnx_model = torch.onnx.export(torch_model, example_input, onnx_path, opset_version=13, export_params=False)
+    else:
+        onnx_model = torch_model
+    # Retrieve ONNX training graph with onnxruntime
+    loss = artifacts.LossType(2)
+    artifacts.generate_artifacts(
+        onnx_model, requires_grad=requires_grad, loss=loss, optimizer=artifacts.OptimType.AdamW, prefix=output_path
+    )
+
+    # Multiple shapes inference pass are needed
+    inferred_model = shape_inference.infer_shapes(onnx.load(train_onnx_path))
+    inferred_model = shape_inference.infer_shapes(inferred_model)
+    inferred_model = shape_inference.infer_shapes(inferred_model)
+
+    processed_model1 = process_poolgrad(inferred_model)
+    print(onnx.checker.check_model(processed_model1))
+    processed_model1 = process_convolution_grad(processed_model1)
+    print(onnx.checker.check_model(processed_model1))
+    processed_model1 = expand_softmax_grad_node(processed_model1)
+    print(onnx.checker.check_model(processed_model1))
+    onnx.save(processed_model1, inferred_train_onnx_path1)
+
+    inferred_model2 = shape_inference.infer_shapes(processed_model1)
+    inferred_model2 = shape_inference.infer_shapes(inferred_model2)
+    inferred_model2 = shape_inference.infer_shapes(inferred_model2)
+
+    # if check:
+    #     model_simplified, check = simplify(inferred_model2, skipped_optimizers=["extract_constant_to_initializer"])
+    # else:
+    #     model_simplified = inferred_model2
+
+    process2 = process_batch_norm(inferred_model2)
+    process2 = shape_inference.infer_shapes(process2)
+    process2 = shape_inference.infer_shapes(process2)
+    onnx.save(process2, inferred_train_onnx_path2)
+    if check:
+        print(onnx.checker.check_model(process2))
+
+    model_simplified, check = simplify(process2, skipped_optimizers=["extract_constant_to_initializer"])
+    process3 = process_1d_nodes(model_simplified)
+    process3 = shape_inference.infer_shapes(process3)
+    onnx.save(process3, inferred_train_onnx_path3)
+    if check:
+        print(onnx.checker.check_model(process3))
+
+    # Check for ConCat nodes with more than two inputs and split them
+    process3 = process_concat_nodes(process3)
+    process3 = shape_inference.infer_shapes(process3)
+    if check:
+        print(onnx.checker.check_model(process3))
+    # Add Optimizer
+    optimizer_model, optimizer_inputs, optimizer_outputs = add_optimizer(process3)
+    onnx.save(optimizer_model, inferred_train_onnx_path4)
+
+    shape_inference.infer_shapes_path(inferred_train_onnx_path4, inferred_train_onnx_path4)
+    if check:
+        print(onnx.checker.check_model(inferred_train_onnx_path4))
+
+    # Split Forward, Backward and Optimizer
+    onnx_model = onnx.load(inferred_train_onnx_path3)
+    forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(onnx_model)
+
+    # print(forward_inputs, backward_inputs, forward_outputs, backward_outputs)
+    onnx.utils.extract_model(
+        inferred_train_onnx_path3,
+        forward_onnx_path,
+        list(set([obj[0] for obj in forward_inputs])),
+        list(set([obj[0] for obj in forward_outputs])),
+        True,
+    )
+    if check:
+        print(onnx.checker.check_model(forward_onnx_path))
+    onnx.utils.extract_model(
+        inferred_train_onnx_path3,
+        backward_onnx_path,
+        list(set([obj[0] for obj in backward_inputs])),
+        list(set([obj[0] for obj in backward_outputs])),
+        True,
+    )
+    if check:
+        print(onnx.checker.check_model(backward_onnx_path))
+    # onnx.utils.extract_model(
+    #     inferred_train_onnx_path4, optimizer_onnx_path, list(set(optimizer_inputs)), list(set(optimizer_outputs)), True
+    # )
+    # if check:
+    #     print(onnx.checker.check_model(optimizer_onnx_path))
+
+    return inferred_train_onnx_path4, forward_onnx_path, backward_onnx_path, optimizer_onnx_path

@@ -1,15 +1,16 @@
+import argparse
+import csv
 import shutil
-from multiprocessing.pool import ThreadPool
 from multiprocessing import Pool
 from os import getpid
 from pathlib import Path
-import csv
+
 import onnx
 import torch
 from onnx import shape_inference
 from onnxruntime.training import artifacts
 from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.core.problem import ElementwiseProblem, Problem, StarmapParallelization
+from pymoo.core.problem import Problem
 from pymoo.operators.crossover.binx import BinomialCrossover
 from pymoo.operators.mutation.bitflip import BitflipMutation
 from pymoo.operators.sampling.rnd import BinaryRandomSampling
@@ -17,14 +18,32 @@ from pymoo.optimize import minimize
 from pymoo.visualization.scatter import Scatter
 
 from model.resnet18 import ResNet18
-from process_onnx import (
-    split_forward_backward,
-)
-from test_ac import apply_onnx_pass, remove_checkpoint
-from tools import run_stream
+from streamtest.checkpointing import apply_onnx_pass, remove_checkpoint
+from streamtest.onnx_processing import split_forward_backward
+from streamtest.stream_runner import run_stream
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Activation checkpointing experiments")
+    parser.add_argument("--mode", choices=["ga", "demo"], default="ga", help="Run GA search or demo pass.")
+    parser.add_argument("--output_path", type=str, default="results/ga_ac/", help="Output directory.")
+    parser.add_argument(
+        "--accelerator_path",
+        type=str,
+        default="stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml",
+        help="Accelerator yaml.",
+    )
+    parser.add_argument(
+        "--mapping_path",
+        type=str,
+        default="stream/stream/inputs/examples/mapping/tpu_like_quad_core_ga.yaml",
+        help="Mapping yaml.",
+    )
+    return parser.parse_args()
 
 
 # TODO: check if the forward outputs and inputs do not need to be recomputed at each pass
+
 def apply_activation_checkpointing(model, recomputations, forward_outputs, forward_inputs):
     for recomputation in recomputations:
         model, compute_cost = remove_checkpoint(model, recomputation, forward_outputs, forward_inputs)
@@ -66,9 +85,9 @@ class ActivationCheckpointingProblem(Problem):
     def single_stream_eval(self, x):
         # Get the process ID for tracking
         pid = getpid()
-        folder = f"{output_path}{pid}/"
+        folder = f"{self.output_path}{pid}/"
         Path(folder).mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(model_path, f"{folder}model.onnx")
+        shutil.copyfile(self.model_path, f"{folder}model.onnx")
         # Generate the ONNX based on X
         recomputations = []
         for variable, activations in zip(x, self.optimization_vars, strict=True):
@@ -136,13 +155,9 @@ def generate_model(output_path):
     return optimization_vars, train_onnx_path, forward_inputs, forward_outputs
 
 
-if __name__ == "__main__":
-    accelerator_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_ga.yaml"
-    output_path = "results/ga_ac/"
-
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(output_path)
+def run_ga(args):
+    Path(args.output_path).mkdir(parents=True, exist_ok=True)
+    optimization_vars, model_path, forward_inputs, forward_outputs = generate_model(args.output_path)
 
     # Run the optimization
     problem = ActivationCheckpointingProblem(
@@ -150,9 +165,9 @@ if __name__ == "__main__":
         forward_inputs,
         forward_outputs,
         model_path,
-        accelerator_path,
-        mapping_path,
-        output_path,
+        args.accelerator_path,
+        args.mapping_path,
+        args.output_path,
         processes=32,
     )
 
@@ -178,7 +193,7 @@ if __name__ == "__main__":
     best_pop_x = res.pop.get("X")
     best_pop_f = res.pop.get("F")
 
-    with open(f"{output_path}result.csv", "w") as file:
+    with open(f"{args.output_path}result.csv", "w") as file:
         writer = csv.writer(file)
         writer.writerow(best_x + best_f)
         for i, (ind_x, ind_f) in enumerate(zip(best_pop_x, best_pop_f, strict=True)):
@@ -190,10 +205,47 @@ if __name__ == "__main__":
             temp_list = [i, j] + individual._X.tolist() + individual._F.tolist()
             history_list.append(temp_list)
 
-    with open(f"{output_path}history.csv", "w") as file:
+    with open(f"{args.output_path}history.csv", "w") as file:
         writer = csv.writer(file)
         writer.writerow(["Run", "Individual", "X", "F"])
         for line in history_list:
             writer.writerow(line)
     # Plot the Pareto front
     Scatter().add(res.F).show()
+
+
+def run_demo(args):
+    folder = "results/ac_test/"
+    onnx_path = f"{folder}model.onnx"
+    infered_path = f"{folder}infered.onnx"
+
+    # Generate, Export and Infer Shapes of a ResNet18 Model
+    model = ResNet18()
+    torch_input = torch.randn(4, 3, 32, 32)
+    torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
+    inferred_model = shape_inference.infer_shapes_path(onnx_path, infered_path)
+
+    # Generate Backward
+    base_model = onnx.load(infered_path)
+    inits = base_model.graph.initializer
+    requires_grad = []
+    for init in inits:
+        # if len(init.dims) != 1 :
+        requires_grad.append(init.name)
+    loss = artifacts.LossType(2)
+
+    from streamtest.checkpointing import apply_activation_checkpointing
+
+    apply_activation_checkpointing(base_model, None, args.accelerator_path, args.mapping_path, folder, requires_grad, "onnx")
+
+
+def main():
+    args = parse_args()
+    if args.mode == "ga":
+        run_ga(args)
+    else:
+        run_demo(args)
+
+
+if __name__ == "__main__":
+    main()

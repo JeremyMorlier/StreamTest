@@ -9,16 +9,9 @@ import torch
 from onnx import shape_inference
 from onnxruntime.training import artifacts
 from onnxsim import simplify
-from stream.api import optimize_allocation_ga
-from stream.utils import CostModelEvaluationLUT
 from zigzag.parser.onnx.utils import get_attribute_ints_with_name
 
-from model.resnet18 import ResNet18
-
-# from stream.visualization.memory_usage import plot_memory_usage
-# from stream.visualization.perfetto import convert_scme_to_perfetto_json
-# from stream.visualization.schedule import visualize_timeline_plotly
-from process_onnx import (
+from streamtest.onnx_processing import (
     add_optimizer,
     expand_softmax_grad_node,
     process_1d_nodes,
@@ -30,8 +23,6 @@ from process_onnx import (
     split_forward_backward,
 )
 
-# Set the logging level to ERROR to suppress warnings
-# ort.set_default_logger_severity(4)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -166,14 +157,6 @@ def copy_nodes_in_onnx_model(onnx_model, subgraph_node_names, checkpoint_name, i
             copied_node.input[i] = new_input
         for i, new_output in enumerate(new_outputs):
             copied_node.output[i] = new_output
-        # copied_node = make_node(
-        #     node.op_type,
-        #     inputs=new_inputs,
-        #     outputs=new_outputs,
-        #     name=f"{node.name}_copy",
-        #     **node.attribute,
-        # )
-        # print("Copy", type(copied_node.attribute))
         copied_nodes.append(copied_node)
 
     # Insert the copied subgraph just before the target node
@@ -356,106 +339,15 @@ def apply_activation_checkpointing(
             inferred_model, checkpoint, forward_outputs, forward_inputs
         )
         print(compute_cost)
-        onnx.save(checkpointed_model, f"{folder}ac_{i}.onnx")
+        onnx.save(checkpointed_model, f"{output_path}ac_{i}.onnx")
 
         # inferred_train_onnx_path4, forward_onnx_path, backward_onnx_path, optimizer_onnx_path = apply_onnx_pass(
-        #     output_path=f"{folder}ac_{i}/", model=checkpointed_model
+        #     output_path=f"{output_path}ac_{i}/", model=checkpointed_model
         # )
         # run_stream(
         #     inferred_train_onnx_path4,
         #     accelerator_path=accelerator_path,
         #     mapping_path=mapping_path,
         #     id=1,
-        #     output_path=f"{folder}ac_{i}/",
+        #     output_path=f"{output_path}ac_{i}/",
         # )
-
-
-def run_stream(model_path, accelerator_path, mapping_path, id, output_path):
-    mode = "fused"
-    layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
-
-    # Evaluate Using Stream
-    # try :
-    scme = optimize_allocation_ga(
-        hardware=accelerator_path,
-        workload=model_path,
-        mapping=mapping_path,
-        mode=mode,
-        layer_stacks=layer_stacks,
-        nb_ga_generations=4,
-        nb_ga_individuals=4,
-        experiment_id=id,
-        output_path=output_path,
-        skip_if_exists=False,
-    )
-    # except Exception as e:
-    #     logging.error(f"Error during optimization: {e}")
-
-    # Load in the CostModelEvaluationLUT from the run
-    cost_lut_path = f"{output_path}/{id}/cost_lut.pickle"
-    cost_lut = CostModelEvaluationLUT(cost_lut_path)
-
-    with open(f"{output_path}/resultt.txt", "a") as f:
-        f.write(f"{scme.energy}    {scme.latency} \n")
-    # # Plotting schedule timeline of best SCME
-    # visualize_timeline_plotly(
-    #     scme,
-    #     draw_dependencies=True,
-    #     draw_communication=True,
-    #     fig_path=f"{output_path}/{id}/schedule.html",
-    #     cost_lut=cost_lut,
-    # )
-    # # Plotting memory usage of best SCME
-    # plot_memory_usage(scme, (0,), (100,), fig_path=f"{output_path}/{id}/memory.png")
-
-    # # Save json for perfetto visualization (Visualize at http://ui.perfetto.dev/)
-    # convert_scme_to_perfetto_json(scme, cost_lut, json_path=f"{output_path}/{id}/scme.json")
-    # Helper function to get shape from value_info
-
-
-if __name__ == "__main__":
-    folder = "results/ac_test/"
-    onnx_path = f"{folder}model.onnx"
-    infered_path = f"{folder}infered.onnx"
-    soc_path = "stream/stream/inputs/examples/hardware/tpu_like_quad_core.yaml"
-    mapping_path = "stream/stream/inputs/examples/mapping/tpu_like_quad_core_ga.yaml"
-    output_path = folder
-
-    # Generate, Export and Infer Shapes of a ResNet18 Model
-    model = ResNet18()
-    torch_input = torch.randn(4, 3, 32, 32)
-    torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
-    inferred_model = shape_inference.infer_shapes_path(onnx_path, infered_path)
-
-    # Generate Backward
-    base_model = onnx.load(infered_path)
-    inits = base_model.graph.initializer
-    requires_grad = []
-    for init in inits:
-        # if len(init.dims) != 1 :
-        requires_grad.append(init.name)
-    loss = artifacts.LossType(2)
-
-    apply_activation_checkpointing(base_model, None, soc_path, mapping_path, folder, requires_grad, "onnx")
-    # Now, we can invoke generate_artifacts with this custom loss function
-    # artifacts.generate_artifacts(
-    #     base_model, requires_grad=requires_grad, loss=loss, optimizer=artifacts.OptimType.AdamW, prefix=folder
-    # )
-
-    # # Infer training graph
-    # inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
-    # inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
-    # inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
-
-    # model = onnx.load(inferred_train_onnx_path)
-    # forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(model)
-    # print([element[0] for element in forward_outputs], [element[0] for element in forward_inputs])
-
-    # for i, checkpoint in enumerate(forward_outputs[2:]):
-    #     onnx_model, compute_cost = remove_checkpoint(model, checkpoint, forward_inputs, forward_outputs)
-    #     print(compute_cost)
-    #     onnx.save(onnx_model, f"{folder}ac_{i}.onnx")
-    #     # break
-
-    # forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(onnx_model)
-    # print([element[0] for element in forward_outputs], [element[0] for element in forward_inputs])

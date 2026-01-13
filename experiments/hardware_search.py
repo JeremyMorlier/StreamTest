@@ -31,17 +31,17 @@ from stream.stages.stage import MainStage
 from zigzag.mapping.temporal_mapping import TemporalMappingType
 from zigzag.utils import pickle_load, pickle_save
 
-from hardware_gen.stream_hardware_generator import (
+from model.resnet18 import ResNet18
+from streamtest.hardware import (
     stream_edge_tpu,
     stream_edge_tpu_core,
     stream_edge_tpu_mapping,
     to_yaml,
 )
-from model.resnet18 import ResNet18
-from process_onnx import (
-    process_1D_nodes,
-    process_convGrad,
-    process_PoolGrad,
+from streamtest.onnx_processing import (
+    process_1d_nodes,
+    process_convolution_grad,
+    process_poolgrad,
     split_forward_backward,
 )
 
@@ -53,6 +53,7 @@ ort.set_default_logger_severity(3)
 def argparser():
     parser = argparse.ArgumentParser(description="Stream Hardware Search for ResNet18")
     parser.add_argument("--output_path", type=str, default="onnx/output/", help="Path to the output directory")
+    parser.add_argument("--mode", type=str, default="fused", help="Stream mode (fused or lbl)")
 
     return parser.parse_args()
 
@@ -140,7 +141,7 @@ def optimize_allocation_ga_no_id(  # noqa: PLR0913
 
 
 class ConfigGenerator:
-    def __init__(self, max_iter, hw_choices, mapping_config, hardware_config, path, nn_path):
+    def __init__(self, max_iter, hw_choices, mapping_config, hardware_config, path, nn_path, mode):
         self.max_iter = max_iter
         self.i = 0
         self.hw_choices = hw_choices
@@ -199,208 +200,169 @@ def evaluate_performance(config):
     soc = stream_edge_tpu(
         hardware_config["xPE"],
         hardware_config["yPE"],
-        "./core.yaml",
-        ["./pooling.yaml", "./simd.yaml"],
-        "./offchip.yaml",
+        core,
+        ["pooling.yaml", "simd.yaml"],
+        "offchip.yaml",
         32,
-        0,
+        0.0,
     )
-    mapping = stream_edge_tpu_mapping(
-        hardware_config["xPE"],
-        hardware_config["yPE"],
-        ["./pooling.yaml", "./simd.yaml"],
-    )
-    # Copy Necessary Files
-    shutil.copyfile(f"{folder}/../../pooling.yaml", f"{folder}/pooling.yaml")
-    shutil.copyfile(f"{folder}/../../simd.yaml", f"{folder}/simd.yaml")
-    shutil.copyfile(f"{folder}/../../offchip.yaml", f"{folder}/offchip.yaml")
-    shutil.copyfile(forward_backward_path, f"{folder}/forward_backward.onnx")
-    shutil.copyfile(forward_path, f"{folder}/forward.onnx")
-    shutil.copyfile(backward_path, f"{folder}/backward.onnx")
+
+    mapping = stream_edge_tpu_mapping(hardware_config["xPE"], hardware_config["yPE"], ["pooling.yaml", "simd.yaml"])
+
+    # Save Configs in a file to preserve the results
     to_yaml(core, f"{folder}/core.yaml")
     to_yaml(soc, f"{folder}/hardware_config.yaml")
     to_yaml(mapping, f"{folder}/mapping_config.yaml")
-    result["core"] = core
-    result["soc"] = soc
 
-    result["forwardbackward"] = {}
-    result["forward"] = {}
-    result["backward"] = {}
     # Evaluate Using Stream
     try:
         scme = optimize_allocation_ga_no_id(
             hardware=f"{folder}/hardware_config.yaml",
-            workload=f"{folder}/forward_backward.onnx",
+            workload=forward_backward_path,
             mapping=f"{folder}/mapping_config.yaml",
             mode=mode,
-            layer_stacks=layer_stacks,
-            nb_ga_generations=4,
-            nb_ga_individuals=4,
-            output_path=f"{folder}/forward_backward",
+            layer_stacks=None,
+            nb_ga_generations=2,
+            nb_ga_individuals=2,
+            output_path=f"{folder}/{mode}/",
             skip_if_exists=False,
         )
-        result["forwardbackward"]["energy"] = scme.energy
-        result["forwardbackward"]["latency"] = scme.latency
+        result["forward_backward"] = [scme.energy, scme.latency]
+        # Memory is not directly available for fused mode
 
         scme = optimize_allocation_ga_no_id(
             hardware=f"{folder}/hardware_config.yaml",
-            workload=f"{folder}/forward.onnx",
+            workload=forward_path,
             mapping=f"{folder}/mapping_config.yaml",
             mode=mode,
-            layer_stacks=layer_stacks,
-            nb_ga_generations=4,
-            nb_ga_individuals=4,
-            output_path=f"{folder}/forward",
+            layer_stacks=None,
+            nb_ga_generations=2,
+            nb_ga_individuals=2,
+            output_path=f"{folder}/forward/",
             skip_if_exists=False,
         )
-        result["forward"]["energy"] = scme.energy
-        result["forward"]["latency"] = scme.latency
+        result["forward"] = [scme.energy, scme.latency]
 
-        # scme = optimize_allocation_ga(
-        #     hardware=f"{folder}/hardware_config.yaml",
-        #     workload=f"{folder}/backward.onnx",
-        #     mapping=f"{folder}/mapping_config.yaml",
-        #     mode=mode,
-        #     layer_stacks=layer_stacks,
-        #     nb_ga_generations=4,
-        #     nb_ga_individuals=4,
-        #     experiment_id=id,
-        #     output_path=folder,
-        #     skip_if_exists=False,
-        # )
-        # result["backward"]["scme"] = vars(scme)
-        # result["backward"]["energy"] = scme["energy"]
-        # result["backward"]["latency"] = scme["latency"]
+        scme = optimize_allocation_ga_no_id(
+            hardware=f"{folder}/hardware_config.yaml",
+            workload=backward_path,
+            mapping=f"{folder}/mapping_config.yaml",
+            mode=mode,
+            layer_stacks=None,
+            nb_ga_generations=2,
+            nb_ga_individuals=2,
+            output_path=f"{folder}/backward/",
+            skip_if_exists=False,
+        )
+        result["backward"] = [scme.energy, scme.latency]
+
+        result["id"] = config["id"]
+        result["hardware_config"] = hardware_config
+        result["mapping_config"] = config["mapping_config"]
     except Exception as e:
-        _logging.error(f"Error: {e}")
-        print(f"Error: {e}")
-        result["forwardbackward"]["energy"] = 0
-        result["forwardbackward"]["latency"] = 0
+        print(f"Error in evaluation: {e}")
+        return {}
 
-        result["forward"]["energy"] = 0
-        result["forward"]["latency"] = 0
-
-        result["backward"]["energy"] = 0
-        result["backward"]["latency"] = 0
-
-    with open(f"{folder}/resultt.txt", "a") as f:
-        json.dump(result, f)
-        f.write("\n")
-    # break
+    return result
 
 
-if __name__ == "__main__":
-    args = argparser()
-    folder = args.output_path
-
-    logger = _logging.getLogger(__name__)
-
-    _logging.disable(_logging.CRITICAL)
-    stream_handler = _logging.StreamHandler()
-    stream_handler.setLevel(_logging.CRITICAL)
-    logger.addHandler(stream_handler)
-    error_handler = _logging.FileHandler("error.log")
-    error_handler.setLevel(_logging.ERROR)
-    logger.addHandler(error_handler)
-
-    onnx_path = f"{folder}/test.onnx"
-    infered_path = f"{folder}/inferred.onnx"
-    train_onnx_path = f"{folder}/training_model.onnx"
-    inferred_train_onnx_path = f"{folder}/infered_training_model.onnx"
-    inferred_train_onnx_path2 = f"{folder}/infered_training_model2.onnx"
-    inferred_train_onnx_path3 = f"{folder}/forward_backward.onnx"
-
-    output_path = f"{folder}/output"
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    # Stream Setups
-    mode = "fused"
-    layer_stacks = [tuple(range(0, 11)), tuple(range(11, 22))] + list((i,) for i in range(22, 49))
-
-    # Copy necessary files for Stream
-    shutil.copyfile("stream/stream/inputs/examples/hardware/cores/pooling.yaml", f"{output_path}/pooling.yaml")
-    shutil.copyfile("stream/stream/inputs/examples/hardware/cores/simd.yaml", f"{output_path}/simd.yaml")
-    shutil.copyfile("stream/stream/inputs/examples/hardware/cores/offchip.yaml", f"{output_path}/offchip.yaml")
-
+def generate_resnet18_onnx(output_path):
+    # Generate, Export and Infer Shapes of a ResNet18 Model
     model = ResNet18()
     torch_input = torch.randn(4, 3, 32, 32)
-    torch.onnx.export(model, torch_input, onnx_path, opset_version=13)
-    inferred_model = shape_inference.infer_shapes_path(onnx_path, infered_path)
+    torch.onnx.export(model, torch_input, f"{output_path}/resnet18.onnx", opset_version=13)
+    inferred_model = shape_inference.infer_shapes_path(
+        f"{output_path}/resnet18.onnx", f"{output_path}/resnet18.onnx"
+    )
 
     # Generate Backward
-    base_model = onnx.load(infered_path)
+    base_model = onnx.load(f"{output_path}/resnet18.onnx")
     inits = base_model.graph.initializer
     requires_grad = []
     for init in inits:
         # if len(init.dims) != 1 :
         requires_grad.append(init.name)
     loss = artifacts.LossType(2)
-    # Now, we can invoke generate_artifacts with this custom loss function
+
     artifacts.generate_artifacts(
-        base_model,
-        requires_grad=requires_grad,
-        loss=loss,
-        optimizer=artifacts.OptimType.AdamW,
-        prefix=folder,
+        base_model, requires_grad=requires_grad, loss=loss, optimizer=artifacts.OptimType.AdamW, prefix=output_path
     )
 
-    # Infer training graph
-    inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
-    inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
-    inferred_model = shape_inference.infer_shapes_path(train_onnx_path, inferred_train_onnx_path)
+    # Multiple shapes inference pass are needed
+    inferred_model = shape_inference.infer_shapes(onnx.load(f"{output_path}/training_model.onnx"))
+    inferred_model = shape_inference.infer_shapes(inferred_model)
+    inferred_model = shape_inference.infer_shapes(inferred_model)
 
-    onnx.save(
-        process_convGrad(process_PoolGrad(onnx.load(inferred_train_onnx_path))),
-        inferred_train_onnx_path2,
-    )
-    inferred_model = shape_inference.infer_shapes_path(inferred_train_onnx_path2, inferred_train_onnx_path2)
-    inferred_model = shape_inference.infer_shapes_path(inferred_train_onnx_path2, inferred_train_onnx_path2)
-    model_simplified, check = simplify(
-        onnx.load(inferred_train_onnx_path2),
-        skipped_optimizers=["extract_constant_to_initializer"],
-    )
-    onnx.save(process_1D_nodes(model_simplified), inferred_train_onnx_path3)
-    inferred_model = shape_inference.infer_shapes_path(inferred_train_onnx_path3, inferred_train_onnx_path3)
-    print(onnx.checker.check_model(inferred_train_onnx_path3))
+    # Process PoolGrad
+    processed_model = process_poolgrad(inferred_model)
+    onnx.save(processed_model, f"{output_path}/processed_model.onnx")
 
-    # Split Forward and Backward
-    onnx_model = onnx.load(inferred_train_onnx_path3)
-    forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(onnx_model)
+    # Process ConvGrad
+    processed_model = process_convolution_grad(processed_model)
+    onnx.save(processed_model, f"{output_path}/processed_model2.onnx")
+
+    # Process 1D Nodes
+    model_simplified, check = simplify(processed_model, skipped_optimizers=["extract_constant_to_initializer"])
+    processed_model = process_1d_nodes(model_simplified)
+    onnx.save(processed_model, f"{output_path}/processed_model3.onnx")
+
+    # Split Forward, Backward and Optimizer
+    forward_inputs, backward_inputs, forward_outputs, backward_outputs = split_forward_backward(processed_model)
     onnx.utils.extract_model(
-        inferred_train_onnx_path3,
-        f"{folder}/forward.onnx",
-        forward_inputs,
-        forward_outputs,
+        f"{output_path}/processed_model3.onnx",
+        f"{output_path}/forward.onnx",
+        [element[0] for element in forward_inputs],
+        [element[0] for element in forward_outputs],
         True,
     )
     onnx.utils.extract_model(
-        inferred_train_onnx_path3,
-        f"{folder}/backward.onnx",
-        backward_inputs,
-        backward_outputs,
+        f"{output_path}/processed_model3.onnx",
+        f"{output_path}/backward.onnx",
+        [element[0] for element in backward_inputs],
+        [element[0] for element in backward_outputs],
+        True,
+    )
+    onnx.utils.extract_model(
+        f"{output_path}/processed_model3.onnx",
+        f"{output_path}/forward_backward.onnx",
+        [element[0] for element in forward_inputs],
+        [element[0] for element in backward_outputs],
         True,
     )
 
-    # Evaluate using Stream
-    hw_choices = {
-        "n_SIMDS": [16, 32, 64, 128],
-        "n_computes_lanes": [1, 2, 4, 8],
-        "PE_Memory": [int(int(element * 1024 * 1024 * 8)) for element in [0.5, 1, 2, 3, 4]],
-        "register_file_size": [int(int(element * 1024 * 8)) for element in [8, 16, 32, 48, 64]],
-        "xPE": [1, 2, 4, 6, 8],
-        "yPE": [1, 2, 4, 6, 8],
-    }
 
-    num_task = 10000
-    num_workers = min(num_task, int(os.cpu_count() / 3) + 1)
-    chunksize = math.ceil(num_task / num_workers)
+def main():
+    # Parse arguments
+    args = argparser()
 
-    config_generator = ConfigGenerator(num_task, hw_choices, None, None, output_path, nn_path=folder)
-    id = 0
+    # Generate ResNet18 ONNX
+    os.makedirs(args.output_path, exist_ok=True)
+    generate_resnet18_onnx(args.output_path)
 
-    config_iterator = iter(config_generator)
-    with Pool(processes=num_workers) as pool:
-        r = pool.map(evaluate_performance, config_iterator, chunksize=chunksize)
-        print(r)
-    # r = process_map(evaluate_performance, config_iterator, max_workers=num_workers, chunksize=chunksize)
-    # print(r)
-    # for config in Config_Generator:
+    # Load hardware choices from config file
+    with open("config.json", "r") as file:
+        hw_choices = json.load(file)
+
+    # Generate mapping configuration
+    mapping_config = stream_edge_tpu_mapping(4, 4, ["pooling.yaml", "simd.yaml"])
+
+    # Setup processing pool
+    max_iter = 200
+    pool = multiprocessing.Pool(processes=32)
+
+    # Create generator for configurations
+    config_gen = ConfigGenerator(max_iter, hw_choices, mapping_config, None, args.output_path, args.output_path, args.mode)
+
+    # Process configurations in parallel
+    results = pool.map(evaluate_performance, config_gen)
+
+    # Save results
+    output_file = f"{args.output_path}/results.json"
+    with open(output_file, "w") as file:
+        json.dump(results, file)
+
+    print(f"Results saved to {output_file}")
+
+
+if __name__ == "__main__":
+    main()

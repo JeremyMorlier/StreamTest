@@ -204,12 +204,20 @@ def stream_edge_tpu(xPEs, yPEs, core, additional_cores, offchip_core, bandwidth,
     # End of rows and columns
     for xPE in range(0, xPEs - 1):
         hardware_architecture["core_connectivity"].append(
-            {"type": "link", "cores": [xPE + (yPEs - 1) * xPEs, (xPE + 1) + (yPEs - 1) * xPEs], "bandwidth": bandwidth}
+            {
+                "type": "link",
+                "cores": [xPE + (yPEs - 1) * xPEs, (xPE + 1) + (yPEs - 1) * xPEs],
+                "bandwidth": bandwidth,
+            }
         )
         # hardware_architecture["core_connectivity"].append(f"{xPE + (yPEs - 1) * xPEs}, {(xPE + 1) + (yPEs - 1) * xPEs}")
     for yPE in range(0, yPEs - 1):
         hardware_architecture["core_connectivity"].append(
-            {"type": "link", "cores": [(xPEs - 1) + yPE * xPEs, (xPEs - 1) + (yPE + 1) * xPEs], "bandwidth": bandwidth}
+            {
+                "type": "link",
+                "cores": [(xPEs - 1) + yPE * xPEs, (xPEs - 1) + (yPE + 1) * xPEs],
+                "bandwidth": bandwidth,
+            }
         )
         # hardware_architecture["core_connectivity"].append(f"{(xPEs - 1) + yPE * xPEs}, {(xPEs - 1) + (yPE + 1) * xPEs}")
 
@@ -240,14 +248,124 @@ def stream_edge_tpu(xPEs, yPEs, core, additional_cores, offchip_core, bandwidth,
     return hardware_architecture
 
 
-# NVIDIA GPUs
-# Tensor Core 8x8x8 bf16
+def generate_offchip_core():
+    return {
+        "name": "dram",
+        "type": "memory",
+        "memories": {
+            "dram": {
+                "size": 1e8,
+                "r_cost": 2000,
+                "w_cost": 2000,
+                "area": 0,
+                "latency": 1,
+                "auto_cost_extraction": False,
+                "operands": ["I1", "I2", "O"],
+                "ports": [
+                    {
+                        "name": "r_port_1",
+                        "type": "read",
+                        "bandwidth_min": 64,
+                        "bandwidth_max": 64,
+                        "allocation": ["I1, tl", "I2, tl", "O, tl", "O, th"],
+                    },
+                    {
+                        "name": "w_port_1",
+                        "type": "write",
+                        "bandwidth_min": 64,
+                        "bandwidth_max": 64,
+                        "allocation": ["I1, fh", "I2, fh", "O, fh", "O, fl"],
+                    },
+                ],
+                "served_dimensions": ["D1", "D2"],
+            }
+        },
+    }
+
+
+def generate_additional_cores():
+    return [
+        {
+            "name": "pooling",
+            "type": "compute",
+            "memories": {
+                "sram_2MB": {
+                    "size": 2**21,
+                    "r_cost": 416.16,
+                    "w_cost": 378.4,
+                    "area": 0,
+                    "latency": 1,
+                    "auto_cost_extraction": False,
+                    "operands": ["I1", "I2", "O"],
+                    "ports": [
+                        {
+                            "name": "r_port_1",
+                            "type": "read",
+                            "bandwidth_min": 64,
+                            "bandwidth_max": 2048,
+                            "allocation": ["I1, tl", "I2, tl", "O, tl", "O, th"],
+                        },
+                        {
+                            "name": "w_port_1",
+                            "type": "write",
+                            "bandwidth_min": 64,
+                            "bandwidth_max": 2048,
+                            "allocation": ["I1, fh", "I2, fh", "O, fh", "O, fl"],
+                        },
+                    ],
+                    "served_dimensions": ["D1", "D2"],
+                },
+            },
+            "operational_array": {
+                "unit_energy": 0.04,
+                "unit_area": 1,
+                "dimensions": ["D1", "D2"],
+                "sizes": [1, 1],
+            },
+            "dataflows": {"D1": ["K, 1"], "D2": ["C, 1"]},
+        },
+        {
+            "name": "simd",
+            "type": "compute",
+            "memories": {
+                "sram_2MB": {
+                    "size": 2**21,
+                    "r_cost": 416.16,
+                    "w_cost": 378.4,
+                    "area": 0,
+                    "latency": 1,
+                    "auto_cost_extraction": False,
+                    "operands": ["I1", "I2", "O"],
+                    "ports": [
+                        {
+                            "name": "r_port_1",
+                            "type": "read",
+                            "bandwidth_min": 64,
+                            "bandwidth_max": 2048,
+                            "allocation": ["I1, tl", "I2, tl", "O, tl", "O, th"],
+                        },
+                        {
+                            "name": "w_port_1",
+                            "type": "write",
+                            "bandwidth_min": 64,
+                            "bandwidth_max": 2048,
+                            "allocation": ["I1, fh", "I2, fh", "O, fh", "O, fl"],
+                        },
+                    ],
+                    "served_dimensions": ["D1", "D2"],
+                },
+            },
+            "operational_array": {
+                "unit_energy": 0.04,
+                "unit_area": 1,
+                "dimensions": ["D1", "D2"],
+                "sizes": [1, 1],
+            },
+            "dataflows": {"D1": ["K, 1"], "D2": ["C, 1"]},
+        },
+    ]
 
 
 def to_yaml(hardware_architecture, path):
     with open(path, "w") as yaml_file:
         yaml.safe_dump(hardware_architecture, yaml_file, sort_keys=False)
-
-
-if __name__ == "__main__":
-    to_yaml(stream_edge_tpu(4, 4, "tpu_like.yaml", ["pooling.yaml", "simd.yaml"], "offchip.yaml", 32, 0), "test.yaml")
